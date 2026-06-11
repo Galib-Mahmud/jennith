@@ -66,7 +66,7 @@ class OnboardingScreen3 extends StatelessWidget {
             style: TextStyle(
               fontSize: 32.sp,
               fontWeight: FontWeight.w800,
-              color: const Color(0xFFD4A843),
+              color: const Color(0xFFE6BF5B),
               height: 1.3,
             ),
           ),
@@ -151,7 +151,7 @@ class OnboardingScreen3 extends StatelessWidget {
       child: ElevatedButton(
         onPressed: () => Get.toNamed(AppRoutes.pricing),
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFFD4A843),
+          backgroundColor: const Color(0xFFE6BF5B),
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(28.r),
@@ -179,7 +179,7 @@ class OnboardingScreen3 extends StatelessWidget {
           // Get.toNamed(AppRoutes.login);
         },
         style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: Color(0xFFD4A843), width: 1.5),
+          side: const BorderSide(color: Color(0xFFE6BF5B), width: 1.5),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(28.r),
           ),

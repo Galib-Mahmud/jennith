@@ -85,7 +85,7 @@ class PricingScreen extends StatelessWidget {
           width: 52.w,
           height: 3.h,
           decoration: BoxDecoration(
-            color: const Color(0xFFD4A843),
+            color: const Color(0xFFE6BF5B),
             borderRadius: BorderRadius.circular(2.r),
           ),
         ),
@@ -130,7 +130,7 @@ class PricingScreen extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 14.sp,
                   fontWeight: FontWeight.w700,
-                  color: const Color(0xFFD4A843),
+                  color: const Color(0xFFE6BF5B),
                 ),
               ),
             ],
@@ -144,7 +144,7 @@ class PricingScreen extends StatelessWidget {
             style: TextStyle(
               fontSize: 44.sp,
               fontWeight: FontWeight.w800,
-              color: const Color(0xFFD4A843),
+              color: const Color(0xFFE6BF5B),
               height: 1.1,
             ),
           ),
@@ -165,7 +165,7 @@ class PricingScreen extends StatelessWidget {
                  Get.toNamed(AppRoutes.signUp);
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFD4A843),
+                backgroundColor: const Color(0xFFE6BF5B),
                 elevation: 0,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(26.r),

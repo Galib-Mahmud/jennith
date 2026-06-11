@@ -58,7 +58,7 @@ class OnboardingScreen2 extends StatelessWidget {
             style: TextStyle(
               fontSize: 34.sp,
               fontWeight: FontWeight.w800,
-              color: const Color(0xFFD4A843),
+              color: const Color(0xFFE6BF5B),
               height: 1.35,
             ),
           ),
@@ -114,7 +114,7 @@ class OnboardingScreen2 extends StatelessWidget {
               width: 76.w,
               height: 76.w,
               decoration: const BoxDecoration(
-                color: Color(0xFFE7C15C),
+                color: Color(0xFFE6BF5B),
                 shape: BoxShape.circle,
               ),
               child: Center(
@@ -202,7 +202,7 @@ class OnboardingScreen2 extends StatelessWidget {
             ),
             child: Icon(
               icon,
-              color: const Color(0xFFD4A843),
+              color: const Color(0xFFE6BF5B),
               size: 20.sp,
             ),
           ),
@@ -239,7 +239,7 @@ class OnboardingScreen2 extends StatelessWidget {
         child: ElevatedButton(
           onPressed: () => Get.toNamed(AppRoutes.onboarding3),
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFFD4A843),
+            backgroundColor: const Color(0xFFE6BF5B),
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(28.r),

@@ -276,7 +276,7 @@ class OnboardingScreen1 extends StatelessWidget {
             width: 36.w,
             height: 36.h,
             decoration: const BoxDecoration(
-              color: Color(0xFFD4A843),
+              color: Color(0xFFE6BF5B),
               shape: BoxShape.circle,
             ),
             child: Icon(Icons.mic, color: Colors.white, size: 18.sp),
@@ -295,7 +295,7 @@ class OnboardingScreen1 extends StatelessWidget {
         child: ElevatedButton(
           onPressed: () => Get.toNamed(AppRoutes.onboarding2),
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFFD4A843),
+            backgroundColor: const Color(0xFFE6BF5B),
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(28.r),
@@ -320,7 +320,7 @@ class _WaveformPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFFD4A843)
+      ..color = const Color(0xFFE6BF5B)
       ..strokeWidth = 2.2
       ..strokeCap = StrokeCap.round;
 
