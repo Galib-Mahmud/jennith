@@ -3,30 +3,17 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 
 import '../../../routes/approute.dart';
+import '../controller/auth_controller.dart';
 import '../widget/auth_widget.dart';
 
-
-class SignInScreen extends StatefulWidget {
+class SignInScreen extends StatelessWidget {
   const SignInScreen({super.key});
 
   @override
-  State<SignInScreen> createState() => _SignInScreenState();
-}
-
-class _SignInScreenState extends State<SignInScreen> {
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  bool _obscurePassword = true;
-
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final controller = AuthController.to;
+    final RxBool obscurePassword = true.obs;
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -36,17 +23,9 @@ class _SignInScreenState extends State<SignInScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(height: 20.h),
-
-              // Back button
               const AuthBackButton(),
-
-
-              // Logo centered
               Center(child: const AuthLogo()),
-
               SizedBox(height: 36.h),
-
-              // Title
               Center(
                 child: Text(
                   'Sign In',
@@ -57,9 +36,7 @@ class _SignInScreenState extends State<SignInScreen> {
                   ),
                 ),
               ),
-
               SizedBox(height: 6.h),
-
               Center(
                 child: Text(
                   'Enter your details to access your account.',
@@ -71,46 +48,42 @@ class _SignInScreenState extends State<SignInScreen> {
                   ),
                 ),
               ),
-
               SizedBox(height: 28.h),
 
               // Email field
               AuthInputField(
                 icon: Icons.mail_outline,
                 hint: 'Enter Email Address',
-                controller: _emailController,
+                controller: controller.emailController,
                 keyboardType: TextInputType.emailAddress,
               ),
 
               SizedBox(height: 14.h),
 
               // Password field
-              AuthInputField(
+              Obx(() => AuthInputField(
                 icon: Icons.lock_outline,
                 hint: 'Enter Password',
-                obscure: _obscurePassword,
-                controller: _passwordController,
+                obscure: obscurePassword.value,
+                controller: controller.passwordController,
                 suffix: GestureDetector(
-                  onTap: () => setState(() => _obscurePassword = !_obscurePassword),
+                  onTap: () => obscurePassword.value = !obscurePassword.value,
                   child: Icon(
-                    _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                    obscurePassword.value
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
                     color: const Color(0xFF999999),
                     size: 18.sp,
                   ),
                 ),
-              ),
+              )),
 
               SizedBox(height: 10.h),
 
-              // Forget Password
               Align(
                 alignment: Alignment.centerRight,
                 child: GestureDetector(
-                  onTap: () {
-                    
-                    Get.toNamed(AppRoutes.forgotPassword);
-
-                  },
+                  onTap: () => Get.toNamed(AppRoutes.forgotPassword),
                   child: Text(
                     'Forget Password?',
                     style: TextStyle(
@@ -125,23 +98,17 @@ class _SignInScreenState extends State<SignInScreen> {
               SizedBox(height: 28.h),
 
               // Sign In button
-              AuthPrimaryButton(
-                label: 'Sign In',
-                onTap: () {
-                  // Handle sign in
-
-                  Get.toNamed(AppRoutes.main);
-                },
-              ),
+              Obx(() => AuthPrimaryButton(
+                label: controller.isLoading.value ? 'Signing In...' : 'Sign In',
+                onTap:  controller.signIn,
+              )),
 
               SizedBox(height: 12.h),
 
               // Sign Up button
               AuthPrimaryButton(
                 label: 'Sign Up',
-                onTap: () {
-
-                },
+                onTap: () => Get.toNamed(AppRoutes.signUp),
               ),
 
               SizedBox(height: 24.h),

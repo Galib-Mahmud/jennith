@@ -1,8 +1,6 @@
-// 2. Account Created Successfully Screen
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-
 import '../../../routes/approute.dart';
 import '../widget/auth_widget.dart';
 
@@ -20,21 +18,13 @@ class AccountCreatedScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(height: 20.h),
-
-              // Back button
               const AuthBackButton(),
-
               SizedBox(height: 28.h),
-
-              // Logo
               Center(child: const AuthLogo()),
-
               SizedBox(height: 48.h),
-
-              // Success Title
               Center(
                 child: Text(
-                  'Account Created Successfully',
+                  'Password Reset Successful',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 24.sp,
@@ -43,12 +33,10 @@ class AccountCreatedScreen extends StatelessWidget {
                   ),
                 ),
               ),
-
               SizedBox(height: 16.h),
-
               Center(
                 child: Text(
-                  'Your account has been created. You can now log in and start exploring your account.',
+                  'Your password has been updated. You can now sign in with your new password.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 13.sp,
@@ -57,17 +45,11 @@ class AccountCreatedScreen extends StatelessWidget {
                   ),
                 ),
               ),
-
               SizedBox(height: 48.h),
-
-              // Sign In button
               AuthPrimaryButton(
                 label: 'Sign In',
-                onTap: () {
-                  Get.offAllNamed(AppRoutes.signIn);
-                },
+                onTap: () => Get.offAllNamed(AppRoutes.signIn),
               ),
-
               SizedBox(height: 24.h),
             ],
           ),

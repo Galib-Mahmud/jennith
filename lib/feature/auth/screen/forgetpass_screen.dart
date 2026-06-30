@@ -1,29 +1,16 @@
-// 3. Forgot Password Screen
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../controller/auth_controller.dart';
+import '../widget/auth_widget.dart';
 import 'package:get/get.dart';
 
-import '../../../routes/approute.dart';
-import '../widget/auth_widget.dart';
-
-class ForgotPasswordScreen extends StatefulWidget {
+class ForgotPasswordScreen extends StatelessWidget {
   const ForgotPasswordScreen({super.key});
 
   @override
-  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
-}
-
-class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
-  final _emailController = TextEditingController();
-
-  @override
-  void dispose() {
-    _emailController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final controller = AuthController.to;
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -33,15 +20,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(height: 20.h),
-
-              // Back button
               const AuthBackButton(),
-
-              // Logo
               Center(child: const AuthLogo()),
-             
-
-              // Title
               Center(
                 child: Text(
                   'Forgot password',
@@ -52,9 +32,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   ),
                 ),
               ),
-
               SizedBox(height: 12.h),
-
               Center(
                 child: Text(
                   'Please enter your email to reset the password',
@@ -66,27 +44,21 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   ),
                 ),
               ),
-
               SizedBox(height: 32.h),
 
-              // Email field
               AuthInputField(
                 icon: Icons.mail_outline,
                 hint: 'Enter Email Address',
-                controller: _emailController,
+                controller: controller.forgotEmailController,
                 keyboardType: TextInputType.emailAddress,
               ),
 
               SizedBox(height: 36.h),
 
-              // Reset Password button
-              AuthPrimaryButton(
-                label: 'Reset Password',
-                onTap: () {
-                  // Handle reset password
-                  Get.toNamed(AppRoutes.verifyCode);
-                },
-              ),
+              Obx(() => AuthPrimaryButton(
+                label: controller.isLoading.value ? 'Sending...' : 'Reset Password',
+                onTap:  controller.forgotPassword,
+              )),
 
               SizedBox(height: 24.h),
             ],

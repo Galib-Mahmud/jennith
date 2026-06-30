@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:get/get.dart';
+
+import '../controller/chat_controller.dart';
 
 class ChatsScreen extends StatefulWidget {
   const ChatsScreen({super.key});
@@ -10,59 +13,91 @@ class ChatsScreen extends StatefulWidget {
 
 class _ChatsScreenState extends State<ChatsScreen> {
   final TextEditingController _msgCtrl = TextEditingController();
+  final ScrollController _scrollCtrl = ScrollController();
 
-  final List<_ChatMessage> _messages = [
-    _ChatMessage(
-      isUser: true,
-      text: 'How do I scale my nail business to 6 figures?',
-    ),
-    _ChatMessage(
-      isUser: false,
-      text:
-      'Start by focusing on three things:\n• Premium pricing\n• Consistent content\n• Client retention systems\n\nMost nail techs work harder. Successful nail techs build systems that work for them.',
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    // If navigated here with arguments (sessionId/coach), load that session.
+    final args = Get.arguments as Map<String, dynamic>?;
+    if (args != null && args['sessionId'] != null) {
+      ChatController.to.openSession(
+        args['sessionId'] as String,
+        coach: args['coach'],
+      );
+    }
+  }
 
   @override
   void dispose() {
     _msgCtrl.dispose();
+    _scrollCtrl.dispose();
     super.dispose();
+  }
+
+  void _send() {
+    final text = _msgCtrl.text;
+    if (text.trim().isEmpty) return;
+    ChatController.to.sendMessage(text);
+    _msgCtrl.clear();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollCtrl.hasClients) {
+        _scrollCtrl.animateTo(
+          _scrollCtrl.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final controller = ChatController.to;
+
     return SafeArea(
       bottom: false,
       child: Column(
         children: [
-          _buildAppBar(),
+          _buildAppBar(controller),
           Expanded(
-            child: ListView.builder(
-              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 16.h),
-              itemCount: _messages.length,
-              itemBuilder: (ctx, i) => _buildBubble(_messages[i]),
-            ),
+            child: Obx(() {
+              if (controller.isLoading.value && controller.messages.isEmpty) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (controller.messages.isEmpty) {
+                return Center(
+                  child: Text(
+                    'Ask anything to get started.',
+                    style: TextStyle(fontSize: 14.sp, color: const Color(0xFF888888)),
+                  ),
+                );
+              }
+              return ListView.builder(
+                controller: _scrollCtrl,
+                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 16.h),
+                itemCount: controller.messages.length,
+                itemBuilder: (ctx, i) => _buildBubble(controller.messages[i]),
+              );
+            }),
           ),
-          _buildInputBar(context),
+          _buildInputBar(context, controller),
         ],
       ),
     );
   }
 
-  // ─── App bar ─────────────────────────────────────────────────────────────
-  Widget _buildAppBar() {
+  // ─── App bar ───────────────────────────────────────────────────────
+  Widget _buildAppBar(ChatController controller) {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(
-          bottom: BorderSide(color: Color(0xFFEEEEEE), width: 1),
-        ),
+        border: Border(bottom: BorderSide(color: Color(0xFFEEEEEE), width: 1)),
       ),
       child: Row(
         children: [
-          Icon(Icons.table_rows_outlined,
-              color: const Color(0xFF1A1A1A), size: 26.sp),
+          Icon(Icons.table_rows_outlined, color: const Color(0xFF1A1A1A), size: 26.sp),
           const Spacer(),
           Container(
             width: 28.w,
@@ -72,26 +107,28 @@ class _ChatsScreenState extends State<ChatsScreen> {
               borderRadius: BorderRadius.circular(6.r),
             ),
             child: Center(
-              child: Text(
-                'P',
+              child: Obx(() => Text(
+                controller.currentCoach.value?.name.substring(0, 1) ?? 'P',
                 style: TextStyle(
                   color: const Color(0xFF888888),
                   fontStyle: FontStyle.italic,
                   fontSize: 13.sp,
                   fontWeight: FontWeight.w500,
                 ),
-              ),
+              )),
             ),
           ),
           SizedBox(width: 8.w),
-          Text(
-            'Pricing Coach',
+          Obx(() => Text(
+            controller.currentCoach.value != null
+                ? '${controller.currentCoach.value!.name} Coach'
+                : 'NailGPT',
             style: TextStyle(
               fontSize: 17.sp,
               fontWeight: FontWeight.w700,
               color: const Color(0xFFD4A843),
             ),
-          ),
+          )),
           const Spacer(),
           SizedBox(width: 26.w),
         ],
@@ -99,8 +136,8 @@ class _ChatsScreenState extends State<ChatsScreen> {
     );
   }
 
-  // ─── Input bar ───────────────────────────────────────────────────────────
-  Widget _buildInputBar(BuildContext context) {
+  // ─── Input bar ─────────────────────────────────────────────────────
+  Widget _buildInputBar(BuildContext context, ChatController controller) {
     return Container(
       color: Colors.white,
       padding: EdgeInsets.only(
@@ -122,10 +159,10 @@ class _ChatsScreenState extends State<ChatsScreen> {
             Expanded(
               child: TextField(
                 controller: _msgCtrl,
+                onSubmitted: (_) => _send(),
                 decoration: InputDecoration(
                   hintText: 'Ask to NailGPT......',
-                  hintStyle: TextStyle(
-                      color: const Color(0xFF888888), fontSize: 14.sp),
+                  hintStyle: TextStyle(color: const Color(0xFF888888), fontSize: 14.sp),
                   border: InputBorder.none,
                   isDense: true,
                   contentPadding: EdgeInsets.symmetric(vertical: 8.h),
@@ -134,15 +171,24 @@ class _ChatsScreenState extends State<ChatsScreen> {
             ),
             Icon(Icons.mic_none, color: const Color(0xFF888888), size: 22.sp),
             SizedBox(width: 8.w),
-            Icon(Icons.send, color: const Color(0xFFD4A843), size: 22.sp),
+            Obx(() => controller.isSending.value
+                ? SizedBox(
+              width: 18.sp,
+              height: 18.sp,
+              child: const CircularProgressIndicator(strokeWidth: 2),
+            )
+                : GestureDetector(
+              onTap: _send,
+              child: Icon(Icons.send, color: const Color(0xFFD4A843), size: 22.sp),
+            )),
           ],
         ),
       ),
     );
   }
 
-  // ─── Chat bubble ─────────────────────────────────────────────────────────
-  Widget _buildBubble(_ChatMessage msg) {
+  // ─── Chat bubble ───────────────────────────────────────────────────
+  Widget _buildBubble(ChatMessageModel msg) {
     if (msg.isUser) {
       return Align(
         alignment: Alignment.centerRight,
@@ -169,7 +215,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
               ),
               Flexible(
                 child: Text(
-                  msg.text,
+                  msg.content,
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 14.sp,
@@ -184,7 +230,6 @@ class _ChatsScreenState extends State<ChatsScreen> {
       );
     }
 
-    // AI bubble
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
@@ -200,7 +245,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
             Row(
               children: [
                 Text(
-                  'NAILGPT 👑:',
+                  'NAILGPT 🤖:',
                   style: TextStyle(
                     fontSize: 13.sp,
                     fontWeight: FontWeight.w700,
@@ -208,28 +253,17 @@ class _ChatsScreenState extends State<ChatsScreen> {
                   ),
                 ),
                 const Spacer(),
-                Icon(Icons.bookmark_border,
-                    size: 18.sp, color: Colors.grey.shade600),
+                Icon(Icons.bookmark_border, size: 18.sp, color: Colors.grey.shade600),
               ],
             ),
             SizedBox(height: 8.h),
             Text(
-              msg.text,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 14.sp,
-                height: 1.5,
-              ),
+              msg.content,
+              style: TextStyle(color: const Color(0xFF1A1A1A), fontSize: 14.sp, height: 1.5),
             ),
           ],
         ),
       ),
     );
   }
-}
-
-class _ChatMessage {
-  final bool isUser;
-  final String text;
-  const _ChatMessage({required this.isUser, required this.text});
 }

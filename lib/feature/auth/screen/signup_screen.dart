@@ -3,38 +3,18 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 
 import '../../../routes/approute.dart';
+import '../controller/auth_controller.dart';
 import '../widget/auth_widget.dart';
 
-
-class SignUpScreen extends StatefulWidget {
+class SignUpScreen extends StatelessWidget {
   const SignUpScreen({super.key});
 
   @override
-  State<SignUpScreen> createState() => _SignUpScreenState();
-}
-
-class _SignUpScreenState extends State<SignUpScreen> {
-  final _nameController        = TextEditingController();
-  final _emailController       = TextEditingController();
-  final _phoneController       = TextEditingController();
-  final _passwordController    = TextEditingController();
-  final _confirmController     = TextEditingController();
-
-  bool _obscurePassword = true;
-  bool _obscureConfirm  = true;
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _emailController.dispose();
-    _phoneController.dispose();
-    _passwordController.dispose();
-    _confirmController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final controller = AuthController.to;
+    final RxBool obscurePassword = true.obs;
+    final RxBool obscureConfirm = true.obs;
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -44,16 +24,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(height: 20.h),
-
-              // Back button
               const AuthBackButton(),
-
-              // Logo
               Center(child: const AuthLogo()),
-
-
-
-              // Title
               Center(
                 child: Text(
                   'Sign Up',
@@ -64,9 +36,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   ),
                 ),
               ),
-
               SizedBox(height: 6.h),
-
               Center(
                 child: Text(
                   'Create an account in just a few simple steps.',
@@ -78,91 +48,84 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   ),
                 ),
               ),
-
               SizedBox(height: 24.h),
 
-              // Full Name
               AuthInputField(
                 icon: Icons.person_outline,
                 hint: 'Enter Full Name',
-                controller: _nameController,
+                controller: controller.fullNameController,
               ),
 
               SizedBox(height: 14.h),
 
-              // Email
               AuthInputField(
                 icon: Icons.mail_outline,
                 hint: 'Enter Email Address',
-                controller: _emailController,
+                controller: controller.signUpEmailController,
                 keyboardType: TextInputType.emailAddress,
               ),
 
               SizedBox(height: 14.h),
 
-              // Mobile Number
               AuthInputField(
                 icon: Icons.phone_outlined,
                 hint: 'Enter Mobile Number',
-                controller: _phoneController,
+                controller: controller.phoneController,
                 keyboardType: TextInputType.phone,
               ),
 
               SizedBox(height: 14.h),
 
-              // Password
-              AuthInputField(
+              Obx(() => AuthInputField(
                 icon: Icons.lock_outline,
                 hint: 'Enter Password',
-                obscure: _obscurePassword,
-                controller: _passwordController,
+                obscure: obscurePassword.value,
+                controller: controller.signUpPasswordController,
                 suffix: GestureDetector(
-                  onTap: () => setState(() => _obscurePassword = !_obscurePassword),
+                  onTap: () => obscurePassword.value = !obscurePassword.value,
                   child: Icon(
-                    _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                    obscurePassword.value
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
                     color: const Color(0xFF999999),
                     size: 18.sp,
                   ),
                 ),
-              ),
+              )),
 
               SizedBox(height: 14.h),
 
-              // Confirm Password
-              AuthInputField(
+              Obx(() => AuthInputField(
                 icon: Icons.lock_outline,
                 hint: 'New Password a Second Time',
-                obscure: _obscureConfirm,
-                controller: _confirmController,
+                obscure: obscureConfirm.value,
+                controller: controller.signUpConfirmController,
                 suffix: GestureDetector(
-                  onTap: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                  onTap: () => obscureConfirm.value = !obscureConfirm.value,
                   child: Icon(
-                    _obscureConfirm ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                    obscureConfirm.value
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
                     color: const Color(0xFF999999),
                     size: 18.sp,
                   ),
                 ),
-              ),
+              )),
 
               SizedBox(height: 28.h),
 
               // Sign Up button
-              AuthPrimaryButton(
-                label: 'Sign Up',
-                onTap: () {
-
-                },
-              ),
+              Obx(() => AuthPrimaryButton(
+                label: controller.isLoading.value ? 'Creating Account...' : 'Sign Up',
+                onTap: controller.signUp
+              )),
 
               SizedBox(height: 16.h),
 
               // Sign In button
               AuthPrimaryButton(
                 label: 'Sign In',
-                onTap: () {
-                  Get.toNamed(AppRoutes.signIn);
-
-                },
+                onTap: () => Get.toNamed(AppRoutes.signIn),
               ),
 
               SizedBox(height: 24.h),

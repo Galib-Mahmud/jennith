@@ -1,33 +1,18 @@
-// 1. Update Password Screen
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-
-import '../../../routes/approute.dart';
+import '../controller/auth_controller.dart';
 import '../widget/auth_widget.dart';
 
-class ResetPasswordScreen extends StatefulWidget {
+class ResetPasswordScreen extends StatelessWidget {
   const ResetPasswordScreen({super.key});
 
   @override
-  State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
-}
-
-class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
-  final _newPasswordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
-  bool _obscureNewPassword = true;
-  bool _obscureConfirmPassword = true;
-
-  @override
-  void dispose() {
-    _newPasswordController.dispose();
-    _confirmPasswordController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final controller = AuthController.to;
+    final RxBool obscureNewPassword = true.obs;
+    final RxBool obscureConfirmPassword = true.obs;
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -37,15 +22,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(height: 20.h),
-
-              // Back button
               const AuthBackButton(),
-
-
-              // Logo
               Center(child: const AuthLogo()),
-
-              // Title
               Center(
                 child: Text(
                   'Password reset',
@@ -56,12 +34,10 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   ),
                 ),
               ),
-
               SizedBox(height: 12.h),
-
               Center(
                 child: Text(
-                  'Enter your email address and we\'ll send you a link to reset your password.',
+                  'Enter your new password below to complete the reset.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 13.sp,
@@ -70,52 +46,50 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   ),
                 ),
               ),
-
               SizedBox(height: 32.h),
 
-              // New Password field
-              AuthInputField(
+              Obx(() => AuthInputField(
                 icon: Icons.lock_outline,
                 hint: 'Enter your new password',
-                obscure: _obscureNewPassword,
-                controller: _newPasswordController,
+                obscure: obscureNewPassword.value,
+                controller: controller.newPasswordController,
                 suffix: GestureDetector(
-                  onTap: () => setState(() => _obscureNewPassword = !_obscureNewPassword),
+                  onTap: () => obscureNewPassword.value = !obscureNewPassword.value,
                   child: Icon(
-                    _obscureNewPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                    obscureNewPassword.value
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
                     color: const Color(0xFF999999),
                     size: 18.sp,
                   ),
                 ),
-              ),
+              )),
 
               SizedBox(height: 14.h),
 
-              // Confirm Password field
-              AuthInputField(
+              Obx(() => AuthInputField(
                 icon: Icons.lock_outline,
                 hint: 'New Password a Second Time',
-                obscure: _obscureConfirmPassword,
-                controller: _confirmPasswordController,
+                obscure: obscureConfirmPassword.value,
+                controller: controller.confirmPasswordController,
                 suffix: GestureDetector(
-                  onTap: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                  onTap: () => obscureConfirmPassword.value = !obscureConfirmPassword.value,
                   child: Icon(
-                    _obscureConfirmPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                    obscureConfirmPassword.value
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
                     color: const Color(0xFF999999),
                     size: 18.sp,
                   ),
                 ),
-              ),
+              )),
 
               SizedBox(height: 36.h),
 
-              // Update Password button
-              AuthPrimaryButton(
-                label: 'Update Password',
-                onTap: () {
-                  Get.toNamed(AppRoutes.accountCreated);
-                },
-              ),
+              Obx(() => AuthPrimaryButton(
+                label: controller.isLoading.value ? 'Updating...' : 'Update Password',
+                onTap: controller.resetPassword,
+              )),
 
               SizedBox(height: 24.h),
             ],
