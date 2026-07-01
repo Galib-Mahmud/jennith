@@ -1,3 +1,5 @@
+// lib/feature/auth/screen/otp_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -24,6 +26,7 @@ class VerifyCodeScreen extends StatelessWidget {
               SizedBox(height: 20.h),
               const AuthBackButton(),
               Center(child: const AuthLogo()),
+
               Center(
                 child: Text(
                   'Check your email',
@@ -34,7 +37,9 @@ class VerifyCodeScreen extends StatelessWidget {
                   ),
                 ),
               ),
+
               SizedBox(height: 16.h),
+
               Obx(() => Center(
                 child: Text(
                   controller.otpFlowType.value == 'register'
@@ -48,60 +53,76 @@ class VerifyCodeScreen extends StatelessWidget {
                   ),
                 ),
               )),
+
               SizedBox(height: 32.h),
 
-              // 6-digit code input
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 8.w),
-                child: PinCodeTextField(
-                  appContext: context,
-                  length: 6,
-                  obscureText: false,
-                  animationType: AnimationType.fade,
-                  keyboardType: TextInputType.number,
-                  controller: controller.otpController,
-                  pinTheme: PinTheme(
-                    shape: PinCodeFieldShape.box,
-                    borderRadius: BorderRadius.circular(12.r),
-                    fieldHeight: 56.h,
-                    fieldWidth: 48.w,
-                    activeFillColor: Colors.white,
-                    inactiveFillColor: Colors.white,
-                    selectedFillColor: Colors.white,
-                    activeColor: const Color(0xFFD4A843),
-                    inactiveColor: const Color(0xFFE0E0E0),
-                    selectedColor: const Color(0xFFD4A843),
-                    borderWidth: 1.2,
+              // ── PIN field ─────────────────────────────────────────
+              // Uses a builder so PinCodeTextField gets a brand-new
+              // controller instance every time the screen rebuilds,
+              // matching the one _resetOtpController() just created.
+              Obx(() {
+                // Reading otpFlowType forces Obx to track; the real
+                // purpose is to rebuild when controller is recreated.
+                controller.otpFlowType.value;
+                return Container(
+                  padding: EdgeInsets.symmetric(horizontal: 8.w),
+                  child: PinCodeTextField(
+                    appContext: context,
+                    length: 6,
+                    obscureText: false,
+                    animationType: AnimationType.fade,
+                    keyboardType: TextInputType.number,
+                    controller: controller.otpController,
+                    pinTheme: PinTheme(
+                      shape: PinCodeFieldShape.box,
+                      borderRadius: BorderRadius.circular(12.r),
+                      fieldHeight: 56.h,
+                      fieldWidth: 48.w,
+                      activeFillColor: Colors.white,
+                      inactiveFillColor: Colors.white,
+                      selectedFillColor: Colors.white,
+                      activeColor: const Color(0xFFD4A843),
+                      inactiveColor: const Color(0xFFE0E0E0),
+                      selectedColor: const Color(0xFFD4A843),
+                      borderWidth: 1.2,
+                    ),
+                    animationDuration: const Duration(milliseconds: 300),
+                    backgroundColor: Colors.transparent,
+                    enableActiveFill: true,
+                    onChanged: (_) {},
+                    onCompleted: (_) {},
                   ),
-                  animationDuration: const Duration(milliseconds: 300),
-                  backgroundColor: Colors.transparent,
-                  enableActiveFill: true,
-                  onCompleted: (v) => controller.otpController.text = v,
-                  onChanged: (value) {},
-                ),
-              ),
+                );
+              }),
 
               SizedBox(height: 28.h),
 
-              // Verify Code button
-              Obx(() => AuthPrimaryButton(
-                label: controller.isLoading.value ? 'Verifying...' : 'Verify Code',
-                onTap:  controller.verifyOtp,
+              Obx(() => AbsorbPointer(
+                absorbing: controller.isLoading.value,
+                child: AuthPrimaryButton(
+                  label: controller.isLoading.value
+                      ? 'Verifying...'
+                      : 'Verify Code',
+                  onTap: controller.verifyOtp,
+                ),
               )),
 
               SizedBox(height: 20.h),
 
-              // Resend email
               Center(
                 child: Obx(() => GestureDetector(
-                  onTap: controller.canResend.value ? controller.resendOtp : null,
+                  onTap: controller.canResend.value
+                      ? controller.resendOtp
+                      : null,
                   child: Text(
                     controller.canResend.value
                         ? "Haven't got the email yet? Resend email"
                         : "Resend available in ${controller.otpTimerLabel}",
                     style: TextStyle(
                       fontSize: 13.sp,
-                      color: const Color(0xFF888888),
+                      color: controller.canResend.value
+                          ? const Color(0xFFD4A843)
+                          : const Color(0xFF888888),
                       fontWeight: FontWeight.w500,
                     ),
                   ),

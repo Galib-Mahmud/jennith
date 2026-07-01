@@ -1,7 +1,7 @@
 // lib/core/endpoint/api_endpoint.dart
 
 class ApiEndpoint {
-  static const String baseUrl = 'https://nailapi.dsrt321.online/';
+  static const String baseUrl = 'https://nailapi.dsrt321.online/api';
 
   // ─── Auth ──────────────────────────────────────────────────────────
   static const String signUp         = "/auth/signup/";
@@ -30,5 +30,5 @@ class ApiEndpoint {
 
   // ─── App: Saved ────────────────────────────────────────────────────
   static const String saved = "/app/saved/";
-  static String unsave(String savedId) => "/app/saved/$savedId/";
+  static String savedItem(String savedId) => "/app/saved/$savedId/";
 }

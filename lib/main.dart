@@ -1,16 +1,27 @@
+// lib/main.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:nail_gpt/core/local_storage/user_info.dart';
 import 'package:nail_gpt/routes/approute.dart';
 import 'package:nail_gpt/routes/pages.dart';
 
-void main() {
+import 'feature/auth/controller/auth_controller.dart';
+
+Future<void> main() async {                          // ← async added
   WidgetsFlutterBinding.ensureInitialized();
+
+  await UserInfo.init();                             // ← must be before runApp
+
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
+
+  Get.put(AuthController(), permanent: true);        // ← init once here
+
   runApp(const MyApp());
 }
 

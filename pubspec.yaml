@@ -15,7 +15,8 @@ dependencies:
   # State management & navigation
   get:
   shared_preferences:
-  http: 
+  http:
+  image_picker:
 
   pin_code_fields: ^8.0.0
 

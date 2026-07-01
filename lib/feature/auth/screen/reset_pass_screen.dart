@@ -1,6 +1,9 @@
+// lib/feature/auth/screen/reset_pass_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+
 import '../controller/auth_controller.dart';
 import '../widget/auth_widget.dart';
 
@@ -10,8 +13,8 @@ class ResetPasswordScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = AuthController.to;
-    final RxBool obscureNewPassword = true.obs;
-    final RxBool obscureConfirmPassword = true.obs;
+    final RxBool obscureNew     = true.obs;
+    final RxBool obscureConfirm = true.obs;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -24,6 +27,7 @@ class ResetPasswordScreen extends StatelessWidget {
               SizedBox(height: 20.h),
               const AuthBackButton(),
               Center(child: const AuthLogo()),
+
               Center(
                 child: Text(
                   'Password reset',
@@ -34,7 +38,9 @@ class ResetPasswordScreen extends StatelessWidget {
                   ),
                 ),
               ),
+
               SizedBox(height: 12.h),
+
               Center(
                 child: Text(
                   'Enter your new password below to complete the reset.',
@@ -46,17 +52,19 @@ class ResetPasswordScreen extends StatelessWidget {
                   ),
                 ),
               ),
+
               SizedBox(height: 32.h),
 
+              // New password
               Obx(() => AuthInputField(
                 icon: Icons.lock_outline,
                 hint: 'Enter your new password',
-                obscure: obscureNewPassword.value,
+                obscure: obscureNew.value,
                 controller: controller.newPasswordController,
                 suffix: GestureDetector(
-                  onTap: () => obscureNewPassword.value = !obscureNewPassword.value,
+                  onTap: () => obscureNew.value = !obscureNew.value,
                   child: Icon(
-                    obscureNewPassword.value
+                    obscureNew.value
                         ? Icons.visibility_off_outlined
                         : Icons.visibility_outlined,
                     color: const Color(0xFF999999),
@@ -67,15 +75,16 @@ class ResetPasswordScreen extends StatelessWidget {
 
               SizedBox(height: 14.h),
 
+              // Confirm password
               Obx(() => AuthInputField(
                 icon: Icons.lock_outline,
                 hint: 'New Password a Second Time',
-                obscure: obscureConfirmPassword.value,
+                obscure: obscureConfirm.value,
                 controller: controller.confirmPasswordController,
                 suffix: GestureDetector(
-                  onTap: () => obscureConfirmPassword.value = !obscureConfirmPassword.value,
+                  onTap: () => obscureConfirm.value = !obscureConfirm.value,
                   child: Icon(
-                    obscureConfirmPassword.value
+                    obscureConfirm.value
                         ? Icons.visibility_off_outlined
                         : Icons.visibility_outlined,
                     color: const Color(0xFF999999),
@@ -86,9 +95,14 @@ class ResetPasswordScreen extends StatelessWidget {
 
               SizedBox(height: 36.h),
 
-              Obx(() => AuthPrimaryButton(
-                label: controller.isLoading.value ? 'Updating...' : 'Update Password',
-                onTap: controller.resetPassword,
+              Obx(() => AbsorbPointer(
+                absorbing: controller.isLoading.value,
+                child: AuthPrimaryButton(
+                  label: controller.isLoading.value
+                      ? 'Updating...'
+                      : 'Update Password',
+                  onTap: controller.resetPassword,
+                ),
               )),
 
               SizedBox(height: 24.h),

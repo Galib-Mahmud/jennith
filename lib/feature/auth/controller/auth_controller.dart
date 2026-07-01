@@ -1,4 +1,4 @@
-// lib/feature/auth/controllers/auth_controller.dart
+// lib/feature/auth/controller/auth_controller.dart
 
 import 'dart:async';
 import 'dart:convert';
@@ -26,25 +26,35 @@ class AuthController extends GetxController {
   Timer? _otpTimer;
 
   // ─── SignUp Controllers ───────────────────────────────────────────
-  final fullNameController = TextEditingController();
-  final signUpEmailController = TextEditingController();
-  final phoneController = TextEditingController();
+  final fullNameController       = TextEditingController();
+  final signUpEmailController    = TextEditingController();
+  final phoneController          = TextEditingController();
   final signUpPasswordController = TextEditingController();
-  final signUpConfirmController = TextEditingController();
+  final signUpConfirmController  = TextEditingController();
 
   // ─── SignIn Controllers ───────────────────────────────────────────
-  final emailController = TextEditingController();
+  final emailController    = TextEditingController();
   final passwordController = TextEditingController();
 
   // ─── Forgot Password Controllers ─────────────────────────────────
   final forgotEmailController = TextEditingController();
 
   // ─── Reset Password Controllers ───────────────────────────────────
-  final newPasswordController = TextEditingController();
+  final newPasswordController     = TextEditingController();
   final confirmPasswordController = TextEditingController();
 
-  // ─── OTP Controller (single pin field, used by pin_code_fields) ──
-  final otpController = TextEditingController();
+  // ─── OTP Controller ───────────────────────────────────────────────
+  // Non-final so it can be recreated safely before each OTP screen visit.
+  TextEditingController otpController = TextEditingController();
+
+  // Safely disposes old controller and creates a fresh one before
+  // navigating to VerifyCodeScreen, preventing "used after dispose" crashes.
+  void _resetOtpController() {
+    try {
+      otpController.dispose();
+    } catch (_) {}
+    otpController = TextEditingController();
+  }
 
   // ─────────────────────────────────────────────────────────────────
   // OTP TIMER
@@ -73,7 +83,6 @@ class AuthController extends GetxController {
   // ─────────────────────────────────────────────────────────────────
   // SIGN UP
   // POST /auth/signup/
-  // body: full_name, email, mobile_number, password, confirm_password
   // ─────────────────────────────────────────────────────────────────
   Future<void> signUp() async {
     if (fullNameController.text.trim().isEmpty ||
@@ -105,7 +114,7 @@ class AuthController extends GetxController {
 
       await UserInfo.setUserEmail(signUpEmailController.text.trim());
       otpFlowType.value = 'register';
-      otpController.clear();
+      _resetOtpController();   // ← fresh controller before navigation
       startOtpTimer();
       _showSuccess('Account created. Check your email for the code.');
       Get.toNamed(AppRoutes.verifyCode);
@@ -120,7 +129,7 @@ class AuthController extends GetxController {
   }
 
   // ─────────────────────────────────────────────────────────────────
-  // VERIFY OTP (shared by register + forgot-password flows)
+  // VERIFY OTP  (shared by register + forgot-password flows)
   // ─────────────────────────────────────────────────────────────────
   Future<void> verifyOtp() async {
     final code = otpController.text.trim();
@@ -158,7 +167,7 @@ class AuthController extends GetxController {
     }
   }
 
-  // POST /auth/verify-reset-otp/  { email, code } -> { reset_token }
+  // POST /auth/verify-reset-otp/  { email, code } → { reset_token }
   Future<void> _verifyForgotPasswordOtp(String code) async {
     isLoading.value = true;
     try {
@@ -185,8 +194,6 @@ class AuthController extends GetxController {
 
   // ─────────────────────────────────────────────────────────────────
   // RESEND OTP
-  // POST /auth/resend-otp/  { email, purpose }   (registration)
-  // POST /auth/forgot-password/ { email }        (reset flow resend)
   // ─────────────────────────────────────────────────────────────────
   Future<void> resendOtp() async {
     if (!canResend.value) return;
@@ -198,6 +205,7 @@ class AuthController extends GetxController {
     }
   }
 
+  // POST /auth/resend-otp/  { email, purpose }
   Future<void> _resendRegistrationOtp() async {
     final email = await UserInfo.getUserEmail();
     if (email == null) return;
@@ -219,6 +227,7 @@ class AuthController extends GetxController {
     }
   }
 
+  // POST /auth/forgot-password/  { email }
   Future<void> _resendForgotPasswordOtp() async {
     final email = await UserInfo.getForgotPasswordEmail();
     if (email == null) return;
@@ -242,10 +251,11 @@ class AuthController extends GetxController {
 
   // ─────────────────────────────────────────────────────────────────
   // SIGN IN
-  // POST /auth/signin/  { email, password } -> { access, refresh, user }
+  // POST /auth/signin/  { email, password } → { access, refresh, user }
   // ─────────────────────────────────────────────────────────────────
   Future<void> signIn() async {
-    if (emailController.text.trim().isEmpty || passwordController.text.isEmpty) {
+    if (emailController.text.trim().isEmpty ||
+        passwordController.text.isEmpty) {
       _showError('Please enter your email and password');
       return;
     }
@@ -271,16 +281,17 @@ class AuthController extends GetxController {
         Get.offAllNamed(AppRoutes.main);
       }
     } on ForbiddenException catch (e) {
-      // Email not verified — backend auto-resends a code
+      // 403 = email not verified — backend auto-resends the code
       final body = _tryParseBody(e.body);
       _showError(_extractMessage(body) ?? 'Email not verified.');
       await UserInfo.setUserEmail(emailController.text.trim());
       otpFlowType.value = 'register';
-      otpController.clear();
+      _resetOtpController();   // ← fresh controller before navigation
       startOtpTimer();
       Get.toNamed(AppRoutes.verifyCode);
     } on UnauthorizedException catch (e) {
-      _showError(_extractMessage(_tryParseBody(e.body)) ?? 'Invalid email or password');
+      _showError(
+          _extractMessage(_tryParseBody(e.body)) ?? 'Invalid email or password');
     } on HttpException catch (e) {
       _showError(_extractMessage(_tryParseBody(e.body)) ?? e.message);
     } catch (e) {
@@ -310,7 +321,7 @@ class AuthController extends GetxController {
       );
       await UserInfo.setForgotPasswordEmail(forgotEmailController.text.trim());
       otpFlowType.value = 'forgot_password';
-      otpController.clear();
+      _resetOtpController();   // ← fresh controller before navigation
       startOtpTimer();
       Get.toNamed(AppRoutes.verifyCode);
     } on HttpException catch (e) {
@@ -397,7 +408,7 @@ class AuthController extends GetxController {
   // SNACKBARS
   // ─────────────────────────────────────────────────────────────────
   void _showError(String message) => Get.snackbar(
-    "Error", message,
+    'Error', message,
     snackPosition: SnackPosition.TOP,
     backgroundColor: Colors.red.shade700,
     colorText: Colors.white,
@@ -408,7 +419,7 @@ class AuthController extends GetxController {
   );
 
   void _showSuccess(String message) => Get.snackbar(
-    "Success", message,
+    'Success', message,
     snackPosition: SnackPosition.TOP,
     backgroundColor: Colors.green.shade700,
     colorText: Colors.white,
@@ -418,9 +429,23 @@ class AuthController extends GetxController {
     duration: const Duration(seconds: 3),
   );
 
+  // ─────────────────────────────────────────────────────────────────
+  // CLEANUP
+  // ─────────────────────────────────────────────────────────────────
   @override
   void onClose() {
     _otpTimer?.cancel();
+    fullNameController.dispose();
+    signUpEmailController.dispose();
+    phoneController.dispose();
+    signUpPasswordController.dispose();
+    signUpConfirmController.dispose();
+    emailController.dispose();
+    passwordController.dispose();
+    forgotEmailController.dispose();
+    newPasswordController.dispose();
+    confirmPasswordController.dispose();
+    try { otpController.dispose(); } catch (_) {}
     super.onClose();
   }
 }
