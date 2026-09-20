@@ -1,15 +1,14 @@
-// lib/feature/home/controller/chat_controller.dart
-
 import 'package:get/get.dart';
-
 import '../../../core/endpoint/api_client.dart';
 import '../../../core/endpoint/api_endpoint.dart';
 import 'home_controller.dart';
 
-/// "Business" -> "Business Coach", "Business Coach" -> "Business Coach"
+/// Extension to normalize coach names (e.g., "Business" -> "Business Coach")
 extension CoachDisplay on CoachModel {
   String get displayName =>
-      name.trim().toLowerCase().endsWith('coach') ? name.trim() : '${name.trim()} Coach';
+      name.trim().toLowerCase().endsWith('coach')
+          ? name.trim()
+          : '${name.trim()} Coach';
 }
 
 class ChatMessageModel {
@@ -38,36 +37,35 @@ class ChatMessageModel {
 }
 
 class ChatController extends GetxController {
-  // Reuses the registered instance instead of building a new controller
-  // (and a new ApiClient / http.Client) on every access.
   static ChatController get to => Get.isRegistered<ChatController>()
       ? Get.find<ChatController>()
       : Get.put(ChatController(), permanent: true);
 
   final ApiClient _apiClient = ApiClient(baseUrl: ApiEndpoint.baseUrl);
 
-  final RxBool isLoading = false.obs; // loading message history
-  final RxBool isSending = false.obs; // sending a new message
+  final RxBool isLoading = false.obs;
+  final RxBool isSending = false.obs;
   final RxList<ChatMessageModel> messages = <ChatMessageModel>[].obs;
 
   final RxString currentSessionId = ''.obs;
   final Rx<CoachModel?> currentCoach = Rx<CoachModel?>(null);
 
-  // ─────────────────────────────────────────────────────────────────
-  // Select a coach (home cards + chat header use this).
-  // Picking a different coach starts a fresh conversation. The server
-  // session is created on the first message, so no empty chats pile up.
-  // ─────────────────────────────────────────────────────────────────
+  /// Selects a coach for a NEW conversation.
   void selectCoach(CoachModel coach) {
-    if (currentCoach.value?.id == coach.id) return;
+    if (currentCoach.value?.id == coach.id && currentSessionId.value.isEmpty) return;
     currentCoach.value = coach;
     currentSessionId.value = '';
     messages.clear();
   }
 
-  // ─────────────────────────────────────────────────────────────────
-  // POST /app/chats/   { coach_id } -> session
-  // ─────────────────────────────────────────────────────────────────
+  /// ✅ Opens an EXISTING chat session from history.
+  Future<void> selectChat(String sessionId, CoachModel coach) async {
+    currentSessionId.value = sessionId;
+    currentCoach.value = coach;
+    messages.clear();
+    await fetchMessages();
+  }
+
   Future<String?> startNewChat(CoachModel coach) async {
     isLoading.value = true;
     try {
@@ -93,9 +91,6 @@ class ChatController extends GetxController {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────
-  // Open an existing chat session — loads coach + message history.
-  // ─────────────────────────────────────────────────────────────────
   Future<void> openSession(String sessionId, {CoachModel? coach}) async {
     currentSessionId.value = sessionId;
     currentCoach.value = coach;
@@ -103,7 +98,6 @@ class ChatController extends GetxController {
     await fetchMessages();
   }
 
-  // GET /app/chats/{id}/messages/
   Future<void> fetchMessages() async {
     if (currentSessionId.value.isEmpty) return;
     isLoading.value = true;
@@ -123,9 +117,6 @@ class ChatController extends GetxController {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────
-  // POST /app/chats/{id}/messages/  { content } -> [userMsg, assistantMsg]
-  // ─────────────────────────────────────────────────────────────────
   Future<void> sendMessage(String content) async {
     final trimmed = content.trim();
     if (trimmed.isEmpty || isSending.value) return;
@@ -138,13 +129,11 @@ class ChatController extends GetxController {
 
     isSending.value = true;
     try {
-      // First message of a new conversation -> create the session now.
       if (currentSessionId.value.isEmpty) {
         final id = await startNewChat(coach);
-        if (id == null) return; // error already shown; finally resets isSending
+        if (id == null) return;
       }
 
-      // Optimistically show the user's message.
       final optimisticMsg = ChatMessageModel(
         id: 'temp-${DateTime.now().millisecondsSinceEpoch}',
         role: 'user',
@@ -163,15 +152,12 @@ class ChatController extends GetxController {
             .map((m) => ChatMessageModel.fromJson(m as Map<String, dynamic>))
             .toList();
 
-        // Replace the optimistic message with the real saved pair.
         messages.removeWhere((m) => m.id == optimisticMsg.id);
         messages.addAll(parsed);
       } on ForbiddenException catch (e) {
         messages.removeWhere((m) => m.id == optimisticMsg.id);
         Get.snackbar('Limit reached', e.message);
       } on HttpException catch (e) {
-        // Keep the user's message visible (per API: it's saved even on 502),
-        // but surface the failure clearly.
         Get.snackbar('Error', e.message);
       } catch (e) {
         messages.removeWhere((m) => m.id == optimisticMsg.id);

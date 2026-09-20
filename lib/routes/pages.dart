@@ -8,6 +8,7 @@ import 'package:nail_gpt/feature/auth/screen/signup_screen.dart';
 import 'package:nail_gpt/feature/home/screen/bottom_nav_bar.dart';
 import 'package:nail_gpt/feature/home/screen/personal_information_screen.dart';
 import 'package:nail_gpt/feature/home/screen/privacy_screen.dart';
+import '../feature/home/screen/chat_history_screen.dart';
 import '../feature/home/screen/chat_screen.dart';
 import '../feature/onboarding/screen/onboarding_screen1.dart';
 import '../feature/onboarding/screen/onboarding_screen2.dart';
@@ -83,7 +84,7 @@ abstract class AppPages {
     ),GetPage(
       name: AppRoutes.chats,
       page: () => const ChatsScreen (),
-    ),
+    ),GetPage(name: '/chat-history', page: () => const ChatHistoryScreen())
 
 
 

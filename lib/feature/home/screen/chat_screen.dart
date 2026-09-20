@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import '../controller/chat_controller.dart';
 import '../controller/home_controller.dart';
 import '../controller/saved_controller.dart';
+import 'chat_history_screen.dart';
 
 class ChatsScreen extends StatefulWidget {
   const ChatsScreen({super.key});
@@ -120,7 +121,11 @@ class _ChatsScreenState extends State<ChatsScreen> {
       ),
       child: Row(
         children: [
-          Icon(Icons.table_rows_outlined, color: const Color(0xFF1A1A1A), size: 26.sp),
+          // ✅ Opens full Chat History screen
+          GestureDetector(
+            onTap: () => Get.to(() => const ChatHistoryScreen()),
+            child: Icon(Icons.table_rows_outlined, color: const Color(0xFF1A1A1A), size: 26.sp),
+          ),
           const Spacer(),
           _buildCoachPicker(controller),
           const Spacer(),
