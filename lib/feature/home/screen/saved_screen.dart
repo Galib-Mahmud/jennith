@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-import 'package:nail_gpt/core/endpoint/api_endpoint.dart';
 
+import '../../home/controller/chat_controller.dart';
+import '../controller/app_navigation.dart';
 import '../controller/saved_controller.dart';
 
 class SavedScreen extends StatelessWidget {
   const SavedScreen({super.key});
+
+  static const _gold = Color(0xFFD4A843);
+  static const _grey = Color(0xFF888888);
 
   String _relativeTime(DateTime dt) {
     final now = DateTime.now();
@@ -39,7 +43,7 @@ class SavedScreen extends StatelessWidget {
               'Your library',
               style: TextStyle(
                 fontSize: 13.sp,
-                color: const Color(0xFF888888),
+                color: _grey,
                 fontWeight: FontWeight.w400,
               ),
             ),
@@ -49,7 +53,7 @@ class SavedScreen extends StatelessWidget {
               style: TextStyle(
                 fontSize: 34.sp,
                 fontStyle: FontStyle.italic,
-                color: const Color(0xFFD4A843),
+                color: _gold,
                 fontWeight: FontWeight.w600,
                 height: 1.1,
               ),
@@ -71,12 +75,11 @@ class SavedScreen extends StatelessWidget {
               ),
               child: TextField(
                 onChanged: (v) => controller.query.value = v,
+                textInputAction: TextInputAction.search,
                 decoration: InputDecoration(
                   hintText: 'Search Saved Items',
-                  hintStyle:
-                  TextStyle(color: const Color(0xFF888888), fontSize: 14.sp),
-                  prefixIcon: Icon(Icons.search,
-                      color: const Color(0xFF888888), size: 20.sp),
+                  hintStyle: TextStyle(color: _grey, fontSize: 14.sp),
+                  prefixIcon: Icon(Icons.search, color: _grey, size: 20.sp),
                   border: InputBorder.none,
                   contentPadding:
                   EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
@@ -93,16 +96,26 @@ class SavedScreen extends StatelessWidget {
                 }
 
                 final list = controller.filtered;
-                if (list.isEmpty) {
-                  return _emptyState(controller.query.value.isNotEmpty);
-                }
 
                 return RefreshIndicator(
-                  onRefresh: controller.fetchSaved,
-                  child: ListView.builder(
+                  color: _gold,
+                  onRefresh: () => controller.fetchSaved(),
+                  child: list.isEmpty
+                      ? _emptyState(
+                    controller: controller,
+                    isSearching: controller.query.value.trim().isNotEmpty,
+                  )
+                      : ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
                     padding: EdgeInsets.only(bottom: 100.h),
                     itemCount: list.length,
-                    itemBuilder: (ctx, i) => _savedCard(context, list[i]),
+                    itemBuilder: (ctx, i) => _savedCard(
+                      key: ValueKey(list[i].id),
+                      controller: controller,
+                      item: list[i],
+                    ),
                   ),
                 );
               }),
@@ -113,21 +126,47 @@ class SavedScreen extends StatelessWidget {
     );
   }
 
-  Widget _emptyState(bool isSearching) {
+  // ─── Empty / error state (inside a ListView so pull-to-refresh works) ──
+  Widget _emptyState({
+    required SavedController controller,
+    required bool isSearching,
+  }) {
+    final failed = controller.hasError.value && controller.items.isEmpty;
+
     return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       children: [
-        SizedBox(height: 120.h),
-        Icon(Icons.bookmark_border,
-            size: 56.sp, color: const Color(0xFFCCCCCC)),
+        SizedBox(height: 100.h),
+        Icon(
+          failed ? Icons.cloud_off_outlined : Icons.bookmark_border,
+          size: 56.sp,
+          color: const Color(0xFFCCCCCC),
+        ),
         SizedBox(height: 12.h),
         Center(
           child: Text(
-            isSearching ? 'No matches found.' : 'Nothing saved yet.',
-            style: TextStyle(fontSize: 15.sp, color: const Color(0xFF888888)),
+            failed
+                ? 'Could not load your saved items.'
+                : (isSearching ? 'No matches found.' : 'Nothing saved yet.'),
+            style: TextStyle(fontSize: 15.sp, color: _grey),
           ),
         ),
-        if (!isSearching) ...[
-          SizedBox(height: 6.h),
+        SizedBox(height: 6.h),
+        if (failed)
+          Center(
+            child: TextButton(
+              onPressed: () => controller.fetchSaved(),
+              child: Text(
+                'Try again',
+                style: TextStyle(
+                  color: _gold,
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          )
+        else if (!isSearching)
           Center(
             child: Text(
               'Tap the bookmark on any answer to save it here.',
@@ -135,17 +174,23 @@ class SavedScreen extends StatelessWidget {
               style: TextStyle(fontSize: 13.sp, color: const Color(0xFFAAAAAA)),
             ),
           ),
-        ],
       ],
     );
   }
 
-  Widget _savedCard(BuildContext context, SavedMessageModel item) {
-    final coachName = item.coach?.name ?? 'Coach';
-    final coachInitial =
-    coachName.isNotEmpty ? coachName.substring(0, 1).toUpperCase() : 'C';
+  // ─── Saved card ────────────────────────────────────────────────────
+  Widget _savedCard({
+    required Key key,
+    required SavedController controller,
+    required SavedMessageModel item,
+  }) {
+    final coachName = item.coach?.displayName ?? 'Coach';
+    final coachInitial = (item.coach?.name.isNotEmpty ?? false)
+        ? item.coach!.name.substring(0, 1).toUpperCase()
+        : 'C';
 
     return Container(
+      key: key,
       margin: EdgeInsets.only(bottom: 16.h),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -163,7 +208,7 @@ class SavedScreen extends StatelessWidget {
         children: [
           // ── Card content ──────────────────────────────────
           Padding(
-            padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 12.h),
+            padding: EdgeInsets.fromLTRB(16.w, 16.h, 10.w, 12.h),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -174,14 +219,14 @@ class SavedScreen extends StatelessWidget {
                       width: 26.w,
                       height: 26.w,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFD4A843).withOpacity(0.12),
+                        color: _gold.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(6.r),
                       ),
                       child: Center(
                         child: Text(
                           coachInitial,
                           style: TextStyle(
-                            color: const Color(0xFFD4A843),
+                            color: _gold,
                             fontStyle: FontStyle.italic,
                             fontSize: 12.sp,
                             fontWeight: FontWeight.w600,
@@ -190,51 +235,77 @@ class SavedScreen extends StatelessWidget {
                       ),
                     ),
                     SizedBox(width: 8.w),
-                    Text(
-                      '$coachName Coach',
-                      style: TextStyle(
-                        color: const Color(0xFFD4A843),
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13.sp,
+                    Flexible(
+                      child: Text(
+                        coachName,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: _gold,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13.sp,
+                        ),
                       ),
                     ),
                     SizedBox(width: 6.w),
-                    Text('·',
-                        style: TextStyle(
-                            color: const Color(0xFF888888), fontSize: 13.sp)),
+                    Text('·', style: TextStyle(color: _grey, fontSize: 13.sp)),
                     SizedBox(width: 6.w),
                     Text(
                       _relativeTime(item.createdAt),
-                      style: TextStyle(
-                          color: const Color(0xFF888888), fontSize: 13.sp),
+                      style: TextStyle(color: _grey, fontSize: 13.sp),
                     ),
                     const Spacer(),
-                    GestureDetector(
-                      onTap: () => controller.unsave(item.id),
-                      child: Icon(Icons.bookmark,
-                          color: const Color(0xFFD4A843), size: 20.sp),
-                    ),
+                    // Unsave (bigger tap target than the icon itself)
+                    Obx(() {
+                      final busy = controller.isBusy(item.messageId);
+                      return InkResponse(
+                        radius: 22.sp,
+                        onTap: busy ? null : () => controller.unsave(item.id),
+                        child: Padding(
+                          padding: EdgeInsets.all(6.sp),
+                          child: busy
+                              ? SizedBox(
+                            width: 20.sp,
+                            height: 20.sp,
+                            child: const CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: _gold,
+                            ),
+                          )
+                              : Icon(Icons.bookmark, color: _gold, size: 20.sp),
+                        ),
+                      );
+                    }),
                   ],
                 ),
                 SizedBox(height: 10.h),
                 // Title (session title)
-                Text(
-                  item.sessionTitle,
-                  style: TextStyle(
-                    color: const Color(0xFFD4A843),
-                    fontStyle: FontStyle.italic,
-                    fontSize: 15.sp,
-                    fontWeight: FontWeight.w600,
+                Padding(
+                  padding: EdgeInsets.only(right: 6.w),
+                  child: Text(
+                    item.sessionTitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: _gold,
+                      fontStyle: FontStyle.italic,
+                      fontSize: 15.sp,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
                 SizedBox(height: 8.h),
                 // Body (message content)
-                Text(
-                  item.content,
-                  style: TextStyle(
-                    color: const Color(0xFF1A1A1A),
-                    fontSize: 14.sp,
-                    height: 1.5,
+                Padding(
+                  padding: EdgeInsets.only(right: 6.w),
+                  child: Text(
+                    item.content,
+                    maxLines: 10,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: const Color(0xFF1A1A1A),
+                      fontSize: 14.sp,
+                      height: 1.5,
+                    ),
                   ),
                 ),
               ],
@@ -247,59 +318,35 @@ class SavedScreen extends StatelessWidget {
             padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
             child: Row(
               children: [
-                GestureDetector(
-                  onTap: () {
-                    Clipboard.setData(ClipboardData(text: item.content));
-                    Get.snackbar('Copied', 'Message copied to clipboard.',
-                        snackPosition: SnackPosition.BOTTOM);
-                  },
-                  child: Row(
-                    children: [
-                      Icon(Icons.copy_outlined,
-                          size: 16.sp, color: const Color(0xFF888888)),
-                      SizedBox(width: 6.w),
-                      Text('Copy',
-                          style: TextStyle(
-                              color: const Color(0xFF888888), fontSize: 13.sp)),
-                    ],
-                  ),
+                _action(
+                  icon: Icons.copy_outlined,
+                  label: 'Copy',
+                  onTap: () => _copy(item.content, 'Message copied to clipboard.'),
                 ),
                 SizedBox(width: 20.w),
-                GestureDetector(
-                  // Swap in share_plus's Share.share(item.content) if you add
-                  // the package; copying keeps this dependency-free for now.
-                  onTap: () {
-                    Clipboard.setData(ClipboardData(text: item.content));
-                    Get.snackbar('Copied', 'Message copied — paste to share.',
-                        snackPosition: SnackPosition.BOTTOM);
-                  },
-                  child: Row(
-                    children: [
-                      Icon(Icons.share_outlined,
-                          size: 16.sp, color: const Color(0xFF888888)),
-                      SizedBox(width: 6.w),
-                      Text('Share',
-                          style: TextStyle(
-                              color: const Color(0xFF888888), fontSize: 13.sp)),
-                    ],
-                  ),
+                // Copies for now. To use the system share sheet, add the
+                // share_plus package and call its share method with item.content.
+                _action(
+                  icon: Icons.share_outlined,
+                  label: 'Share',
+                  onTap: () => _copy(item.content, 'Message copied. Paste it to share.'),
                 ),
                 const Spacer(),
                 GestureDetector(
+                  behavior: HitTestBehavior.opaque,
                   onTap: () => _openChat(item),
                   child: Row(
                     children: [
                       Text(
                         'Open chat',
                         style: TextStyle(
-                          color: const Color(0xFFD4A843),
+                          color: _gold,
                           fontSize: 13.sp,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                       SizedBox(width: 4.w),
-                      Icon(Icons.chevron_right,
-                          color: const Color(0xFFD4A843), size: 16.sp),
+                      Icon(Icons.chevron_right, color: _gold, size: 16.sp),
                     ],
                   ),
                 ),
@@ -311,14 +358,34 @@ class SavedScreen extends StatelessWidget {
     );
   }
 
-  SavedController get controller => SavedController.to;
+  Widget _action({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Row(
+        children: [
+          Icon(icon, size: 16.sp, color: _grey),
+          SizedBox(width: 6.w),
+          Text(label, style: TextStyle(color: _grey, fontSize: 13.sp)),
+        ],
+      ),
+    );
+  }
 
+  void _copy(String text, String message) {
+    Clipboard.setData(ClipboardData(text: text));
+    Get.closeAllSnackbars();
+    Get.snackbar('Copied', message, snackPosition: SnackPosition.BOTTOM);
+  }
+
+  // Loads that session into the chat screen, then switches to it.
   void _openChat(SavedMessageModel item) {
     if (item.sessionId.isEmpty) return;
-    // Mirrors HomeScreen's navigation into the chat screen.
-    Get.toNamed(ApiEndpoint.chats, arguments: {
-      'sessionId': item.sessionId,
-      'coach': item.coach,
-    });
+    ChatController.to.openSession(item.sessionId, coach: item.coach);
+    AppNavigator.openChatTab();
   }
 }

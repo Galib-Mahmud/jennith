@@ -1,10 +1,16 @@
-// lib/feature/chat/controllers/chat_controller.dart
+// lib/feature/home/controller/chat_controller.dart
 
 import 'package:get/get.dart';
 
 import '../../../core/endpoint/api_client.dart';
 import '../../../core/endpoint/api_endpoint.dart';
 import 'home_controller.dart';
+
+/// "Business" -> "Business Coach", "Business Coach" -> "Business Coach"
+extension CoachDisplay on CoachModel {
+  String get displayName =>
+      name.trim().toLowerCase().endsWith('coach') ? name.trim() : '${name.trim()} Coach';
+}
 
 class ChatMessageModel {
   final String id;
@@ -32,16 +38,32 @@ class ChatMessageModel {
 }
 
 class ChatController extends GetxController {
-  static ChatController get to => Get.put(ChatController(), permanent: true);
+  // Reuses the registered instance instead of building a new controller
+  // (and a new ApiClient / http.Client) on every access.
+  static ChatController get to => Get.isRegistered<ChatController>()
+      ? Get.find<ChatController>()
+      : Get.put(ChatController(), permanent: true);
 
   final ApiClient _apiClient = ApiClient(baseUrl: ApiEndpoint.baseUrl);
 
-  final RxBool isLoading = false.obs;     // loading message history
-  final RxBool isSending = false.obs;     // sending a new message
+  final RxBool isLoading = false.obs; // loading message history
+  final RxBool isSending = false.obs; // sending a new message
   final RxList<ChatMessageModel> messages = <ChatMessageModel>[].obs;
 
   final RxString currentSessionId = ''.obs;
   final Rx<CoachModel?> currentCoach = Rx<CoachModel?>(null);
+
+  // ─────────────────────────────────────────────────────────────────
+  // Select a coach (home cards + chat header use this).
+  // Picking a different coach starts a fresh conversation. The server
+  // session is created on the first message, so no empty chats pile up.
+  // ─────────────────────────────────────────────────────────────────
+  void selectCoach(CoachModel coach) {
+    if (currentCoach.value?.id == coach.id) return;
+    currentCoach.value = coach;
+    currentSessionId.value = '';
+    messages.clear();
+  }
 
   // ─────────────────────────────────────────────────────────────────
   // POST /app/chats/   { coach_id } -> session
@@ -89,8 +111,9 @@ class ChatController extends GetxController {
       final response =
       await _apiClient.get(ApiEndpoint.chatMessages(currentSessionId.value));
       final list = (response as List?) ?? [];
-      messages.value =
-          list.map((m) => ChatMessageModel.fromJson(m as Map<String, dynamic>)).toList();
+      messages.value = list
+          .map((m) => ChatMessageModel.fromJson(m as Map<String, dynamic>))
+          .toList();
     } on HttpException catch (e) {
       Get.snackbar('Error', e.message);
     } catch (e) {
@@ -105,40 +128,55 @@ class ChatController extends GetxController {
   // ─────────────────────────────────────────────────────────────────
   Future<void> sendMessage(String content) async {
     final trimmed = content.trim();
-    if (trimmed.isEmpty || currentSessionId.value.isEmpty) return;
+    if (trimmed.isEmpty || isSending.value) return;
 
-    // Optimistically show the user's message.
-    final optimisticMsg = ChatMessageModel(
-      id: 'temp-${DateTime.now().millisecondsSinceEpoch}',
-      role: 'user',
-      content: trimmed,
-      createdAt: DateTime.now(),
-    );
-    messages.add(optimisticMsg);
+    final coach = currentCoach.value;
+    if (coach == null) {
+      Get.snackbar('Select a coach', 'Choose a coach at the top of the chat first.');
+      return;
+    }
 
     isSending.value = true;
     try {
-      final response = await _apiClient.post(
-        ApiEndpoint.chatMessages(currentSessionId.value),
-        body: {'content': trimmed},
-      );
-      final list = (response as List?) ?? [];
-      final parsed =
-      list.map((m) => ChatMessageModel.fromJson(m as Map<String, dynamic>)).toList();
+      // First message of a new conversation -> create the session now.
+      if (currentSessionId.value.isEmpty) {
+        final id = await startNewChat(coach);
+        if (id == null) return; // error already shown; finally resets isSending
+      }
 
-      // Replace the optimistic message with the real saved pair.
-      messages.removeWhere((m) => m.id == optimisticMsg.id);
-      messages.addAll(parsed);
-    } on ForbiddenException catch (e) {
-      messages.removeWhere((m) => m.id == optimisticMsg.id);
-      Get.snackbar('Limit reached', e.message);
-    } on HttpException catch (e) {
-      // Keep the user's message visible (per API: it's saved even on 502),
-      // but surface the failure clearly.
-      Get.snackbar('Error', e.message);
-    } catch (e) {
-      messages.removeWhere((m) => m.id == optimisticMsg.id);
-      Get.snackbar('Error', 'Message failed to send. Please try again.');
+      // Optimistically show the user's message.
+      final optimisticMsg = ChatMessageModel(
+        id: 'temp-${DateTime.now().millisecondsSinceEpoch}',
+        role: 'user',
+        content: trimmed,
+        createdAt: DateTime.now(),
+      );
+      messages.add(optimisticMsg);
+
+      try {
+        final response = await _apiClient.post(
+          ApiEndpoint.chatMessages(currentSessionId.value),
+          body: {'content': trimmed},
+        );
+        final list = (response as List?) ?? [];
+        final parsed = list
+            .map((m) => ChatMessageModel.fromJson(m as Map<String, dynamic>))
+            .toList();
+
+        // Replace the optimistic message with the real saved pair.
+        messages.removeWhere((m) => m.id == optimisticMsg.id);
+        messages.addAll(parsed);
+      } on ForbiddenException catch (e) {
+        messages.removeWhere((m) => m.id == optimisticMsg.id);
+        Get.snackbar('Limit reached', e.message);
+      } on HttpException catch (e) {
+        // Keep the user's message visible (per API: it's saved even on 502),
+        // but surface the failure clearly.
+        Get.snackbar('Error', e.message);
+      } catch (e) {
+        messages.removeWhere((m) => m.id == optimisticMsg.id);
+        Get.snackbar('Error', 'Message failed to send. Please try again.');
+      }
     } finally {
       isSending.value = false;
     }

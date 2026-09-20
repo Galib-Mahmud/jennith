@@ -103,4 +103,11 @@ class UserInfo {
 
   // ======= Clear All (logout) ======= //
   static Future<void> clearAll() async => await _p.clear();
+
+  // Logout / session expiry: tokens muche, kintu onboarding flag rekhe dey
+  static Future<void> clearSession() async {
+    final onboarding = _p.getBool('onboarding_completed');
+    await _p.clear();
+    if (onboarding != null) await _p.setBool('onboarding_completed', onboarding);
+  }
 }

@@ -149,7 +149,7 @@ class OnboardingScreen3 extends StatelessWidget {
       width: double.infinity,
       height: 50.h,
       child: ElevatedButton(
-        onPressed: () => Get.toNamed(AppRoutes.pricing),
+        onPressed: () => Get.toNamed(AppRoutes.signUp),
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFFE6BF5B),
           elevation: 0,
@@ -176,7 +176,7 @@ class OnboardingScreen3 extends StatelessWidget {
       height: 50.h,
       child: OutlinedButton(
         onPressed: () {
-          // Get.toNamed(AppRoutes.login);
+          Get.toNamed(AppRoutes.signIn);
         },
         style: OutlinedButton.styleFrom(
           side: const BorderSide(color: Color(0xFFE6BF5B), width: 1.5),

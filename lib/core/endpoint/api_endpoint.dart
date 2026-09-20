@@ -1,7 +1,7 @@
 // lib/core/endpoint/api_endpoint.dart
 
 class ApiEndpoint {
-  static const String baseUrl = 'https://nailapi.dsrt321.online/api';
+  static const String baseUrl = 'https://nailapi.sobhoy.com/api';
 
   // ─── Auth ──────────────────────────────────────────────────────────
   static const String signUp         = "/auth/signup/";

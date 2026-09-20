@@ -1,5 +1,6 @@
 // lib/feature/saved/controller/saved_controller.dart
 
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../core/endpoint/api_client.dart';
@@ -7,8 +8,8 @@ import '../../../core/endpoint/api_endpoint.dart';
 import '../../home/controller/home_controller.dart'; // CoachModel
 
 class SavedMessageModel {
-  final String id; // saved-record id — use THIS to unsave
-  final String messageId;
+  final String id; // saved-record id — use THIS to unsave (DELETE /app/saved/{id}/)
+  final String messageId; // chat message id — use THIS to save (POST /app/saved/)
   final String content;
   final DateTime createdAt; // when it was saved
   final String sessionId;
@@ -25,14 +26,17 @@ class SavedMessageModel {
     required this.coach,
   });
 
-  // The saved-list response shape isn't in the Postman examples, so this
-  // parses defensively: it supports a nested payload
-  //   { id, message:{id,content,created_at}, session:{id,title}, coach:{...} }
-  // as well as a flat one { id, message_id, content, session_id, ... }.
+  // API shape:
+  // { id, message:{id,role,content,created_at}, session:{id,title},
+  //   coach:{id,name}, created_at }
+  // Also tolerates a flat payload { id, message_id, content, session_id, ... }.
   factory SavedMessageModel.fromJson(Map<String, dynamic> json) {
-    final message = json['message'] as Map<String, dynamic>?;
-    final session = json['session'] as Map<String, dynamic>?;
-    final coachJson = json['coach'] as Map<String, dynamic>?;
+    Map<String, dynamic>? asMap(dynamic v) =>
+        v is Map ? Map<String, dynamic>.from(v) : null;
+
+    final message = asMap(json['message']);
+    final session = asMap(json['session']);
+    final coachJson = asMap(json['coach']);
 
     return SavedMessageModel(
       id: json['id']?.toString() ?? '',
@@ -51,13 +55,23 @@ class SavedMessageModel {
 }
 
 class SavedController extends GetxController {
-  static SavedController get to => Get.put(SavedController(), permanent: true);
+  // Reuses the registered instance (no new ApiClient / http.Client per access).
+  static SavedController get to => Get.isRegistered<SavedController>()
+      ? Get.find<SavedController>()
+      : Get.put(SavedController(), permanent: true);
 
   final ApiClient _apiClient = ApiClient(baseUrl: ApiEndpoint.baseUrl);
 
   final RxBool isLoading = false.obs;
+  final RxBool hasError = false.obs;
   final RxList<SavedMessageModel> items = <SavedMessageModel>[].obs;
   final RxString query = ''.obs;
+
+  /// Message ids with a save/unsave request in flight (blocks double taps and
+  /// lets the bookmark icon show a spinner).
+  final RxSet<String> busyMessageIds = <String>{}.obs;
+
+  Future<void>? _loading;
 
   // Client-side search over content, coach name and session title.
   List<SavedMessageModel> get filtered {
@@ -76,32 +90,76 @@ class SavedController extends GetxController {
     fetchSaved();
   }
 
+  /// Call on logout so the next user never sees this user's saved items.
+  void clear() {
+    items.clear();
+    query.value = '';
+    busyMessageIds.clear();
+    hasError.value = false;
+  }
+
   // ─────────────────────────────────────────────────────────────────
-  // GET /app/saved/
+  // GET /app/saved/   (bare list OR paginated { results, next })
+  // Concurrent calls share one request.
   // ─────────────────────────────────────────────────────────────────
-  Future<void> fetchSaved() async {
+  Future<void> fetchSaved({bool silent = false}) =>
+      _loading ??= _fetch(silent).whenComplete(() => _loading = null);
+
+  Future<void> _fetch(bool silent) async {
     isLoading.value = true;
+    hasError.value = false;
     try {
-      final response = await _apiClient.get(ApiEndpoint.saved);
-      // May be a bare list or a paginated { results: [...] }.
-      final list = response is List
-          ? response
-          : (response is Map<String, dynamic>
-          ? (response['results'] as List? ?? [])
-          : []);
-      items.value = list
-          .map((e) => SavedMessageModel.fromJson(e as Map<String, dynamic>))
-          .toList();
+      final all = <SavedMessageModel>[];
+      String? endpoint = ApiEndpoint.saved;
+      var pages = 0;
+
+      while (endpoint != null && pages < 20) {
+        final response = await _apiClient.get(endpoint);
+        pages++;
+
+        List<dynamic> rows = const [];
+        String? next;
+        if (response is List) {
+          rows = response;
+        } else if (response is Map<String, dynamic>) {
+          rows = (response['results'] as List?) ?? const [];
+          next = _relativeNext(response['next']);
+        }
+
+        all.addAll(rows
+            .whereType<Map>()
+            .map((e) => SavedMessageModel.fromJson(Map<String, dynamic>.from(e))));
+        endpoint = next;
+      }
+
+      items.assignAll(all);
     } on HttpException catch (e) {
-      Get.snackbar('Error', e.message);
-    } catch (e) {
-      Get.snackbar('Error', 'Could not load saved items.');
+      hasError.value = true;
+      if (!silent) _error('Error', e.message);
+    } catch (_) {
+      hasError.value = true;
+      if (!silent) _error('Error', 'Could not load saved items.');
     } finally {
       isLoading.value = false;
     }
   }
 
+  // "https://host/api/app/saved/?page=2"  ->  "/app/saved/?page=2"
+  String? _relativeNext(dynamic next) {
+    if (next is! String || next.isEmpty) return null;
+    final uri = Uri.tryParse(next);
+    if (uri == null) return null;
+    var path = uri.path;
+    final basePath = Uri.parse(ApiEndpoint.baseUrl).path; // e.g. "/api"
+    if (basePath.isNotEmpty && path.startsWith(basePath)) {
+      path = path.substring(basePath.length);
+    }
+    return uri.hasQuery ? '$path?${uri.query}' : path;
+  }
+
   bool isSaved(String messageId) => items.any((s) => s.messageId == messageId);
+
+  bool isBusy(String messageId) => busyMessageIds.contains(messageId);
 
   SavedMessageModel? _byMessageId(String messageId) {
     for (final s in items) {
@@ -112,26 +170,41 @@ class SavedController extends GetxController {
 
   // ─────────────────────────────────────────────────────────────────
   // POST /app/saved/   { message_id }
-  // 400 → user message / already saved · 404 → not found / not yours
+  // 400 -> user message / already saved · 404 -> not found / not yours
   // ─────────────────────────────────────────────────────────────────
   Future<bool> saveMessage(String messageId) async {
+    if (messageId.isEmpty || messageId.startsWith('temp-')) return false;
+    if (busyMessageIds.contains(messageId)) return false;
+    if (isSaved(messageId)) return true;
+
+    busyMessageIds.add(messageId);
     try {
       final response = await _apiClient.post(
         ApiEndpoint.saved,
         body: {'message_id': messageId},
       );
+
       if (response is Map<String, dynamic>) {
-        items.insert(0, SavedMessageModel.fromJson(response));
+        final saved = SavedMessageModel.fromJson(response);
+        if (!items.any((s) => s.id == saved.id)) items.insert(0, saved);
       } else {
-        await fetchSaved();
+        await fetchSaved(silent: true);
       }
+      _toast('Saved');
       return true;
     } on HttpException catch (e) {
-      Get.snackbar('Could not save', e.message);
+      if (e.statusCode == 400) {
+        // Possibly "already saved" (list was not loaded yet) -> sync and check.
+        await fetchSaved(silent: true);
+        if (isSaved(messageId)) return true;
+      }
+      _error('Could not save', e.message);
       return false;
-    } catch (e) {
-      Get.snackbar('Error', 'Could not save message.');
+    } catch (_) {
+      _error('Error', 'Could not save message.');
       return false;
+    } finally {
+      busyMessageIds.remove(messageId);
     }
   }
 
@@ -140,26 +213,43 @@ class SavedController extends GetxController {
   // ─────────────────────────────────────────────────────────────────
   Future<bool> unsave(String savedId) async {
     final index = items.indexWhere((s) => s.id == savedId);
-    SavedMessageModel? removed;
-    if (index != -1) {
-      removed = items[index];
+    final removed = index == -1 ? null : items[index];
+
+    if (removed != null) {
+      if (busyMessageIds.contains(removed.messageId)) return false;
+      busyMessageIds.add(removed.messageId);
       items.removeAt(index);
     }
+
+    void rollback() {
+      if (removed != null && !items.any((s) => s.id == removed.id)) {
+        items.insert(index.clamp(0, items.length).toInt(), removed);
+      }
+    }
+
     try {
       await _apiClient.delete(ApiEndpoint.savedItem(savedId));
+      _toast(
+        'Removed from saved',
+        onUndo: removed == null ? null : () => saveMessage(removed.messageId),
+      );
       return true;
+    } on NotFoundException {
+      return true; // already deleted on the server — the goal is reached
     } on HttpException catch (e) {
-      if (removed != null) items.insert(index, removed);
-      Get.snackbar('Error', e.message);
+      rollback();
+      _error('Error', e.message);
       return false;
-    } catch (e) {
-      if (removed != null) items.insert(index, removed);
-      Get.snackbar('Error', 'Could not remove saved item.');
+    } catch (_) {
+      rollback();
+      _error('Error', 'Could not remove saved item.');
       return false;
+    } finally {
+      if (removed != null) busyMessageIds.remove(removed.messageId);
     }
   }
 
-  // Handy for a bookmark toggle on a chat bubble (by message id).
+  // Bookmark toggle on a chat bubble (by chat message id).
   Future<void> toggleByMessage(String messageId) async {
     final existing = _byMessageId(messageId);
     if (existing != null) {
@@ -167,5 +257,40 @@ class SavedController extends GetxController {
     } else {
       await saveMessage(messageId);
     }
+  }
+
+  // ─── Feedback ─────────────────────────────────────────────────────
+  void _error(String title, String message) {
+    Get.closeAllSnackbars();
+    Get.snackbar(title, message, snackPosition: SnackPosition.TOP);
+  }
+
+  void _toast(String message, {VoidCallback? onUndo}) {
+    Get.closeAllSnackbars();
+    Get.showSnackbar(GetSnackBar(
+      message: message,
+      duration: const Duration(seconds: 3),
+      snackPosition: SnackPosition.BOTTOM,
+      // Sits above the floating bottom-nav pill.
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+      borderRadius: 12,
+      backgroundColor: const Color(0xFF1A1A1A),
+      isDismissible: true,
+      mainButton: onUndo == null
+          ? null
+          : TextButton(
+        onPressed: () {
+          Get.closeCurrentSnackbar();
+          onUndo();
+        },
+        child: const Text(
+          'UNDO',
+          style: TextStyle(
+            color: Color(0xFFD4A843),
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    ));
   }
 }

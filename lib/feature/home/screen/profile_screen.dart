@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:nail_gpt/feature/auth/controller/auth_controller.dart';
 import 'package:nail_gpt/feature/home/screen/privacy_screen.dart';
 import 'package:nail_gpt/feature/home/screen/terms_screen.dart';
+import 'package:nail_gpt/routes/approute.dart';
 
 import '../controller/profile_controller.dart';
 import 'personal_information_screen.dart';
@@ -151,24 +153,27 @@ class ProfileScreen extends StatelessWidget {
 
                   SizedBox(height: 24.h),
 
-                  // Logout
+                  // ── Logout ────────────────────────────────────
                   GestureDetector(
                     onTap: () => _confirmLogout(context, controller),
                     behavior: HitTestBehavior.opaque,
-                    child: Row(
-                      children: [
-                        Icon(Icons.logout,
-                            color: const Color(0xFFE53935), size: 22.sp),
-                        SizedBox(width: 14.w),
-                        Text(
-                          'Logout',
-                          style: TextStyle(
-                            color: const Color(0xFFE53935),
-                            fontSize: 15.sp,
-                            fontWeight: FontWeight.w500,
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 13.h),
+                      child: Row(
+                        children: [
+                          Icon(Icons.logout,
+                              color: const Color(0xFFE53935), size: 22.sp),
+                          SizedBox(width: 14.w),
+                          Text(
+                            'Logout',
+                            style: TextStyle(
+                              color: const Color(0xFFE53935),
+                              fontSize: 15.sp,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
 
@@ -247,7 +252,7 @@ class ProfileScreen extends StatelessWidget {
     if (!context.mounted) return;
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: Text('Upgrade to Premium', style: TextStyle(fontSize: 17.sp)),
         content: Text(
           message ?? 'Payments are coming soon.',
@@ -255,7 +260,7 @@ class ProfileScreen extends StatelessWidget {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('OK'),
           ),
         ],
@@ -264,10 +269,12 @@ class ProfileScreen extends StatelessWidget {
   }
 
   // ─── Logout confirmation ────────────────────────────────────────────
+  // Removes access + refresh token (AuthController.logout -> UserInfo.clearAll)
+  // and sends the user to the sign-in screen, clearing the back stack.
   void _confirmLogout(BuildContext context, ProfileController controller) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: Text('Log out?', style: TextStyle(fontSize: 17.sp)),
         content: Text(
           'You will need to sign in again to continue.',
@@ -275,15 +282,14 @@ class ProfileScreen extends StatelessWidget {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () async {
-              Navigator.pop(context);
-              await controller.logout();
-              // TODO: point this at your login route, e.g.
-              // Get.offAllNamed(AppRoute.signIn);
+              Navigator.pop(dialogContext); // close the dialog
+              controller.profile.value = null; // next user must not see old data
+              await AuthController.to.logout(); // clears tokens + goes to sign-in
             },
             child: const Text(
               'Log out',
@@ -301,7 +307,10 @@ class ProfileScreen extends StatelessWidget {
     required VoidCallback onTap,
   }) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: () {
+        Get.toNamed(AppRoutes.pricing);
+      }
+      ,
       behavior: HitTestBehavior.opaque,
       child: Padding(
         padding: EdgeInsets.symmetric(vertical: 13.h),

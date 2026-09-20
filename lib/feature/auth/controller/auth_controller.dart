@@ -20,6 +20,7 @@ class AuthController extends GetxController {
   // OTP flow type: 'register' | 'forgot_password'
   final RxString otpFlowType = 'register'.obs;
 
+
   // ─── OTP Timer ────────────────────────────────────────────────────
   final RxInt otpTimerSeconds = 60.obs;
   final RxBool canResend = false.obs;
@@ -131,6 +132,25 @@ class AuthController extends GetxController {
   // ─────────────────────────────────────────────────────────────────
   // VERIFY OTP  (shared by register + forgot-password flows)
   // ─────────────────────────────────────────────────────────────────
+
+
+  bool _loggingOut = false;
+
+  Future<void> logout() async {
+    if (_loggingOut) return;
+    _loggingOut = true;
+    try {
+      _otpTimer?.cancel();
+      await UserInfo.clearSession();
+      emailController.clear();
+      passwordController.clear();
+      Get.offAllNamed(AppRoutes.signIn);
+    } finally {
+      _loggingOut = false;
+    }
+  }
+
+
   Future<void> verifyOtp() async {
     final code = otpController.text.trim();
     if (code.length < 6) {

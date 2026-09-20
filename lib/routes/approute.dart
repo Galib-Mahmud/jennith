@@ -25,6 +25,7 @@ static const accountCreated = '/accountCreated';
   static const terms = '/terms';
   static const privacy = '/privacy';
   static const personal = '/personal';
+  static const chats = '/chats';
 
 
 

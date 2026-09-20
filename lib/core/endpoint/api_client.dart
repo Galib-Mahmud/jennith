@@ -1,9 +1,13 @@
 // lib/core/endpoint/api_client.dart
 
 import 'dart:convert';
-import 'dart:io';
+import 'dart:io' show File;
+
+import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'package:http/http.dart' as http;
 
+import '../../feature/auth/controller/auth_controller.dart';
+import '../../feature/auth/controller/token_refresher.dart';
 import '../local_storage/user_info.dart';
 
 class ApiClient {
@@ -30,8 +34,8 @@ class ApiClient {
 
   // ─── Auth Header ──────────────────────────────────────────────────
   // Reads token from in-memory cache — SYNCHRONOUS, zero async gap.
-  // UserInfo.init() in main() guarantees the cache is populated before
-  // any controller's onInit() fires.
+  // Called again on every attempt, so a retry after a token refresh
+  // automatically uses the NEW access token.
   Map<String, String> _authHeaders() {
     final token = UserInfo.getAccessTokenSync();
     return {
@@ -40,18 +44,71 @@ class ApiClient {
     };
   }
 
+  Map<String, String> _headers(bool requiresAuth, Map<String, String>? extra) =>
+      {
+        ...(requiresAuth ? _authHeaders() : _defaultHeaders),
+        ...?extra,
+      };
+
+  // ─── Core request runner (handles 401 -> refresh -> retry) ────────
+  Future<dynamic> _request(
+      Future<http.Response> Function() send,
+      Uri url, {
+        required String method,
+        required bool requiresAuth,
+      }) async {
+    final tokenUsed = UserInfo.getAccessTokenSync();
+    var response = await send();
+
+    if (response.statusCode == 401 && requiresAuth) {
+      final current = UserInfo.getAccessTokenSync();
+
+      if (current != null && current.isNotEmpty && current != tokenUsed) {
+        // Another request already refreshed the token while this one was
+        // in flight -> just retry with the new token.
+        response = await send();
+      } else {
+        final result = await TokenRefresher.refresh();
+        if (result == RefreshResult.success) {
+          response = await send(); // retry once with the new access token
+        } else if (result == RefreshResult.invalid) {
+          // Refresh token expired / rejected -> back to sign-in.
+          await AuthController.to.logout();
+        }
+        // RefreshResult.unavailable (offline / server down): keep the user
+        // signed in, the original 401 is thrown below.
+      }
+    }
+
+    return _handleResponse(response, url, method: method);
+  }
+
   // ─── GET ──────────────────────────────────────────────────────────
   Future<dynamic> get(
       String endpoint, {
         Map<String, String>? headers,
-        bool requiresAuth = true, Map<String, String?>? queryParameters,
+        bool requiresAuth = true,
+        Map<String, String?>? queryParameters,
       }) async {
-    final url = Uri.parse(_buildUrl(endpoint));
-    final baseHeaders = requiresAuth ? _authHeaders() : {..._defaultHeaders};
-    final mergedHeaders = {...baseHeaders, ...?headers};
-    _logRequest("GET", url, mergedHeaders, null);
-    final response = await _httpClient.get(url, headers: mergedHeaders);
-    return _handleResponse(response, url, method: "GET");
+    var url = Uri.parse(_buildUrl(endpoint));
+    if (queryParameters != null) {
+      final query = {
+        for (final e in queryParameters.entries)
+          if (e.value != null) e.key: e.value!,
+      };
+      if (query.isNotEmpty) {
+        url = url.replace(
+          queryParameters: {...url.queryParameters, ...query},
+        );
+      }
+    }
+    _logRequest("GET", url, _headers(requiresAuth, headers), null);
+    return _request(
+          () => _httpClient.get(url, headers: _headers(requiresAuth, headers)),
+      url,
+      method: "GET",
+      requiresAuth: requiresAuth,
+    );
   }
 
   // ─── POST ─────────────────────────────────────────────────────────
@@ -62,12 +119,15 @@ class ApiClient {
         bool requiresAuth = true,
       }) async {
     final url = Uri.parse(_buildUrl(endpoint));
-    final baseHeaders = requiresAuth ? _authHeaders() : {..._defaultHeaders};
-    final mergedHeaders = {...baseHeaders, ...?headers};
     final encodedBody = body != null ? jsonEncode(body) : null;
-    _logRequest("POST", url, mergedHeaders, body);
-    final response = await _httpClient.post(url, headers: mergedHeaders, body: encodedBody);
-    return _handleResponse(response, url, method: "POST");
+    _logRequest("POST", url, _headers(requiresAuth, headers), body);
+    return _request(
+          () => _httpClient.post(url,
+          headers: _headers(requiresAuth, headers), body: encodedBody),
+      url,
+      method: "POST",
+      requiresAuth: requiresAuth,
+    );
   }
 
   // ─── PUT ──────────────────────────────────────────────────────────
@@ -78,12 +138,15 @@ class ApiClient {
         bool requiresAuth = true,
       }) async {
     final url = Uri.parse(_buildUrl(endpoint));
-    final baseHeaders = requiresAuth ? _authHeaders() : {..._defaultHeaders};
-    final mergedHeaders = {...baseHeaders, ...?headers};
     final encodedBody = body != null ? jsonEncode(body) : null;
-    _logRequest("PUT", url, mergedHeaders, body);
-    final response = await _httpClient.put(url, headers: mergedHeaders, body: encodedBody);
-    return _handleResponse(response, url, method: "PUT");
+    _logRequest("PUT", url, _headers(requiresAuth, headers), body);
+    return _request(
+          () => _httpClient.put(url,
+          headers: _headers(requiresAuth, headers), body: encodedBody),
+      url,
+      method: "PUT",
+      requiresAuth: requiresAuth,
+    );
   }
 
   // ─── PATCH ────────────────────────────────────────────────────────
@@ -94,12 +157,15 @@ class ApiClient {
         bool requiresAuth = true,
       }) async {
     final url = Uri.parse(_buildUrl(endpoint));
-    final baseHeaders = requiresAuth ? _authHeaders() : {..._defaultHeaders};
-    final mergedHeaders = {...baseHeaders, ...?headers};
     final encodedBody = body != null ? jsonEncode(body) : null;
-    _logRequest("PATCH", url, mergedHeaders, body);
-    final response = await _httpClient.patch(url, headers: mergedHeaders, body: encodedBody);
-    return _handleResponse(response, url, method: "PATCH");
+    _logRequest("PATCH", url, _headers(requiresAuth, headers), body);
+    return _request(
+          () => _httpClient.patch(url,
+          headers: _headers(requiresAuth, headers), body: encodedBody),
+      url,
+      method: "PATCH",
+      requiresAuth: requiresAuth,
+    );
   }
 
   // ─── DELETE ───────────────────────────────────────────────────────
@@ -110,12 +176,15 @@ class ApiClient {
         bool requiresAuth = true,
       }) async {
     final url = Uri.parse(_buildUrl(endpoint));
-    final baseHeaders = requiresAuth ? _authHeaders() : {..._defaultHeaders};
-    final mergedHeaders = {...baseHeaders, ...?headers};
     final encodedBody = body != null ? jsonEncode(body) : null;
-    _logRequest("DELETE", url, mergedHeaders, body);
-    final response = await _httpClient.delete(url, headers: mergedHeaders, body: encodedBody);
-    return _handleResponse(response, url, method: "DELETE");
+    _logRequest("DELETE", url, _headers(requiresAuth, headers), body);
+    return _request(
+          () => _httpClient.delete(url,
+          headers: _headers(requiresAuth, headers), body: encodedBody),
+      url,
+      method: "DELETE",
+      requiresAuth: requiresAuth,
+    );
   }
 
   // ─── MULTIPART ────────────────────────────────────────────────────
@@ -127,32 +196,43 @@ class ApiClient {
         bool requiresAuth = true,
       }) async {
     final url = Uri.parse(_buildUrl(endpoint));
-    final token = requiresAuth ? UserInfo.getAccessTokenSync() : null;
-    final request = http.MultipartRequest(method, url);
-    if (token != null && token.isNotEmpty) {
-      request.headers["Authorization"] = "Bearer $token";
-    }
-    request.headers["Accept"] = "application/json";
-    if (fields != null) request.fields.addAll(fields);
-    if (files != null) {
-      for (final entry in files.entries) {
-        request.files.add(
-            await http.MultipartFile.fromPath(entry.key, entry.value.path));
+
+    // A MultipartRequest can only be sent once, so it is rebuilt on every
+    // attempt (needed for the retry after a token refresh).
+    Future<http.Response> send() async {
+      final request = http.MultipartRequest(method, url);
+      final token = requiresAuth ? UserInfo.getAccessTokenSync() : null;
+      if (token != null && token.isNotEmpty) {
+        request.headers["Authorization"] = "Bearer $token";
       }
+      request.headers["Accept"] = "application/json";
+      if (fields != null) request.fields.addAll(fields);
+      if (files != null) {
+        for (final entry in files.entries) {
+          request.files.add(
+              await http.MultipartFile.fromPath(entry.key, entry.value.path));
+        }
+      }
+      return http.Response.fromStream(await request.send());
     }
-    print("🌐 [$method MULTIPART] URL: $url");
-    print("📋 Fields: $fields");
-    print("📎 Files: ${files?.keys.toList()}");
-    final streamedResponse = await request.send();
-    final response = await http.Response.fromStream(streamedResponse);
-    return _handleResponse(response, url, method: "$method MULTIPART");
+
+    _log("🌐 [$method MULTIPART] URL: $url");
+    _log("📋 Fields: $fields");
+    _log("📎 Files: ${files?.keys.toList()}");
+
+    return _request(
+      send,
+      url,
+      method: "$method MULTIPART",
+      requiresAuth: requiresAuth,
+    );
   }
 
   // ─── Response Handler ─────────────────────────────────────────────
   dynamic _handleResponse(http.Response response, Uri url,
       {required String method}) {
-    print("📩 [$method] Status: ${response.statusCode}");
-    print("📩 [$method] Body: ${response.body}");
+    _log("📩 [$method] Status: ${response.statusCode}");
+    _log("📩 [$method] Body: ${response.body}");
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
       if (response.body.isEmpty) return null;
@@ -213,14 +293,23 @@ class ApiClient {
     }
   }
 
-  // ─── Logger ───────────────────────────────────────────────────────
+  // ─── Logger (debug builds only, token hidden) ─────────────────────
+  void _log(String message) {
+    if (kDebugMode) debugPrint(message);
+  }
+
   void _logRequest(String method, Uri url, Map<String, String> headers,
       dynamic body) {
-    print("─────────────────────────────────────");
-    print("🌐 [$method] $url");
-    print("📋 Headers: $headers");
-    if (body != null) print("📦 Body: $body");
-    print("─────────────────────────────────────");
+    if (!kDebugMode) return;
+    final safeHeaders = {
+      for (final e in headers.entries)
+        e.key: e.key.toLowerCase() == 'authorization' ? 'Bearer ***' : e.value,
+    };
+    debugPrint("─────────────────────────────────────");
+    debugPrint("🌐 [$method] $url");
+    debugPrint("📋 Headers: $safeHeaders");
+    if (body != null) debugPrint("📦 Body: $body");
+    debugPrint("─────────────────────────────────────");
   }
 }
 

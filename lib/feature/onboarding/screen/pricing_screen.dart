@@ -162,7 +162,7 @@ class PricingScreen extends StatelessWidget {
             height: 50.h,
             child: ElevatedButton(
               onPressed: () {
-                 Get.toNamed(AppRoutes.signUp);
+                 // Get.toNamed(AppRoutes.signUp);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFE6BF5B),

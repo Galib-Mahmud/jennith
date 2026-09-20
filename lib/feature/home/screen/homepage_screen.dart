@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-import 'package:nail_gpt/core/endpoint/api_endpoint.dart';
-
-import '../../../routes/approute.dart';
+import '../controller/app_navigation.dart';
 import '../controller/chat_controller.dart';
 import '../controller/home_controller.dart';
 
@@ -41,9 +39,18 @@ class HomeScreen extends StatelessWidget {
     return 'Good evening,';
   }
 
+  // Select the coach and go to the chat tab.
+  void _onCoachTap(CoachModel coach) {
+    ChatController.to.selectCoach(coach);
+    _openChatTab();
+  }
+
+  void _openChatTab() => AppNavigator.openChatTab();
+
   @override
   Widget build(BuildContext context) {
     final controller = HomeController.to;
+    final chat = ChatController.to;
 
     return SafeArea(
       bottom: false,
@@ -88,22 +95,18 @@ class HomeScreen extends StatelessWidget {
 
               SizedBox(height: 28.h),
 
-              // Coach cards
-              ...controller.coaches.map((coach) => _coachCard(
-                icon: _iconFor(coach.icon),
-                iconColor: _colorFor(coach.accentColor),
-                title: coach.name,
-                subtitle: coach.tagline,
-                onTap: () async {
-                  final sessionId = await ChatController.to.startNewChat(coach);
-                  if (sessionId != null) {
-                    Get.toNamed(ApiEndpoint.chats, arguments: {
-                      'sessionId': sessionId,
-                      'coach': coach,
-                    });
-                  }
-                },
-              )),
+              // Coach cards (the selected one is highlighted)
+              ...controller.coaches.map((coach) => Obx(() {
+                final selected = chat.currentCoach.value?.id == coach.id;
+                return _coachCard(
+                  icon: _iconFor(coach.icon),
+                  iconColor: _colorFor(coach.accentColor),
+                  title: coach.displayName,
+                  subtitle: coach.tagline,
+                  selected: selected,
+                  onTap: () => _onCoachTap(coach),
+                );
+              })),
 
               SizedBox(height: 100.h),
             ],
@@ -118,16 +121,24 @@ class HomeScreen extends StatelessWidget {
     required Color iconColor,
     required String title,
     required String subtitle,
+    required bool selected,
     required VoidCallback onTap,
   }) {
+    const gold = Color(0xFFD4A843);
+
     return GestureDetector(
       onTap: onTap,
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
         margin: EdgeInsets.only(bottom: 14.h),
         padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 18.h),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: selected ? const Color(0xFFFFF8E6) : Colors.white,
           borderRadius: BorderRadius.circular(16.r),
+          border: Border.all(
+            color: selected ? gold : Colors.transparent,
+            width: 1.5,
+          ),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.06),
@@ -172,6 +183,10 @@ class HomeScreen extends StatelessWidget {
                 ],
               ),
             ),
+            if (selected) ...[
+              SizedBox(width: 8.w),
+              Icon(Icons.check_circle, color: gold, size: 22.sp),
+            ],
           ],
         ),
       ),
