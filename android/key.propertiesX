@@ -1,0 +1,4 @@
+storePassword=galib123456
+keyPassword=galib123456
+keyAlias=upload
+storeFile=/home/galib/upload-keystore.jks
