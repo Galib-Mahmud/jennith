@@ -67,15 +67,6 @@ class SignUpScreen extends StatelessWidget {
 
               SizedBox(height: 14.h),
 
-              AuthInputField(
-                icon: Icons.phone_outlined,
-                hint: 'Enter Mobile Number',
-                controller: controller.phoneController,
-                keyboardType: TextInputType.phone,
-              ),
-
-              SizedBox(height: 14.h),
-
               Obx(() => AuthInputField(
                 icon: Icons.lock_outline,
                 hint: 'Enter Password',
